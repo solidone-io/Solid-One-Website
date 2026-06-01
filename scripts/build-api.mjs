@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 
 await build({
-  entryPoints: ["api/src/index.ts"],
+  entryPoints: ["api-src/index.ts"],
   bundle: true,
   outfile: "api/index.js",
   platform: "node",

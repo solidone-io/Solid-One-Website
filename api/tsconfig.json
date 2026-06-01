@@ -11,5 +11,5 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["./src/**/*.ts", "../server/**/*.ts"]
+  "include": ["../api-src/**/*.ts", "../server/**/*.ts"]
 }
