@@ -8,8 +8,8 @@
     "dev": "concurrently -k -n web,api \"pnpm dev:web\" \"pnpm dev:api\"",
     "dev:web": "vite --config vite.config.ts --host 0.0.0.0",
     "dev:api": "tsx watch server/index.ts",
-    "build": "vite build --config vite.config.ts",
-    "vercel-build": "vite build --config vite.config.ts",
+    "build": "vite build --config vite.config.ts && node scripts/build-api.mjs",
+    "vercel-build": "pnpm run build",
     "start": "cross-env NODE_ENV=production tsx server/index.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -61,6 +61,7 @@
     "cross-env": "^7.0.3",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
+    "esbuild": "0.27.3",
     "framer-motion": "catalog:",
     "input-otp": "^1.4.2",
     "lucide-react": "catalog:",
@@ -91,9 +92,9 @@
     "dompurify": "^3.4.7",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
-    "typescript": "~5.9.3",
     "multer": "^2.1.1",
     "solana-icons": "^0.2.2",
+    "typescript": "~5.9.3",
     "zod": "catalog:"
   }
 }
