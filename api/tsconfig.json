@@ -1,11 +1,15 @@
 {
-  "extends": "../tsconfig.base.json",
-  "include": ["./**/*.ts", "../server/**/*.ts"],
   "compilerOptions": {
-    "noEmit": false,
+    "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
-    "skipLibCheck": true
-  }
+    "esModuleInterop": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "noEmit": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true
+  },
+  "include": ["./**/*.ts", "../server/**/*.ts"]
 }

@@ -13,8 +13,8 @@ const supportBodySchema = z.object({
   message: z.string().trim().min(1, "Message is required.").max(5000),
 });
 
-function validationError(parsed: z.SafeParseError<unknown>): string {
-  return parsed.error.issues[0]?.message ?? "Invalid form data.";
+function validationError(error: z.ZodError): string {
+  return error.issues[0]?.message ?? "Invalid form data.";
 }
 
 export async function handleSupportPost(
@@ -22,7 +22,7 @@ export async function handleSupportPost(
 ): Promise<{ status: number; json: Record<string, unknown> }> {
   const parsed = supportBodySchema.safeParse(body);
   if (!parsed.success) {
-    return { status: 400, json: { error: validationError(parsed) } };
+    return { status: 400, json: { error: validationError(parsed.error) } };
   }
 
   const data = parsed.data;

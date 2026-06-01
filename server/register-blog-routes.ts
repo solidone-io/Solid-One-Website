@@ -43,8 +43,8 @@ const postBodySchema = z.object({
   published: z.boolean().optional(),
 });
 
-function postValidationError(parsed: z.SafeParseError<unknown>) {
-  return parsed.error.issues.map((i) => i.message).join(" ") || "Invalid post data.";
+function postValidationError(error: z.ZodError) {
+  return error.issues.map((i) => i.message).join(" ") || "Invalid post data.";
 }
 
 type RegisterOptions = {
@@ -149,7 +149,7 @@ export function registerBlogRoutes(app: express.Express, { requireAdmin, uploads
     asyncRoute(async (req, res) => {
       const parsed = postBodySchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: postValidationError(parsed) });
+        res.status(400).json({ error: postValidationError(parsed.error) });
         return;
       }
       const data = parsed.data;
@@ -182,7 +182,7 @@ export function registerBlogRoutes(app: express.Express, { requireAdmin, uploads
       }
       const parsed = postBodySchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: postValidationError(parsed) });
+        res.status(400).json({ error: postValidationError(parsed.error) });
         return;
       }
       const data = parsed.data;
