@@ -37,6 +37,7 @@ data/
 
 # accidental local tsc output (Vercel compiles api/ itself)
 api/index.js
+api/src/*.js
 server/*.js
 
 # misc
