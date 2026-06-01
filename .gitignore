@@ -35,6 +35,10 @@ node_modules
 # local API data
 data/
 
+# accidental local tsc output (Vercel compiles api/ itself)
+api/index.js
+server/*.js
+
 # misc
 /.sass-cache
 /connect.lock

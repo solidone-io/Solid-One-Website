@@ -3,6 +3,8 @@
   "include": ["./**/*.ts", "../server/**/*.ts"],
   "compilerOptions": {
     "noEmit": false,
+    "outDir": ".build",
+    "rootDir": "..",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "types": ["node"],
