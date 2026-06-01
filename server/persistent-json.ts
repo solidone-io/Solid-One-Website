@@ -5,10 +5,18 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(__dirname, "..", "data");
 
-mkdirSync(dataDir, { recursive: true });
-
 export function useBlobStorage(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+}
+
+/** Local dev only — Vercel serverless has a read-only project filesystem. */
+function ensureLocalDataDir(): void {
+  if (useBlobStorage() || process.env.VERCEL) return;
+  try {
+    mkdirSync(dataDir, { recursive: true });
+  } catch {
+    // ignore EROFS / permission errors
+  }
 }
 
 export async function readJsonFile<T>(filename: string, fallback: T): Promise<T> {
@@ -33,6 +41,7 @@ export async function readJsonFile<T>(filename: string, fallback: T): Promise<T>
 export async function writeJsonFile<T>(filename: string, data: T): Promise<void> {
   const body = JSON.stringify(data, null, 2);
   if (!useBlobStorage()) {
+    ensureLocalDataDir();
     writeFileSync(path.join(dataDir, filename), body, "utf8");
     return;
   }

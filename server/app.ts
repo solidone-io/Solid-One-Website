@@ -22,14 +22,21 @@ import {
 } from "./support-handler.js";
 import { registerBlogRoutes } from "./register-blog-routes.js";
 import { asyncRoute } from "./async-route.js";
+import { useBlobStorage } from "./persistent-json.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function createApp() {
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "solidone-admin";
+  const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD ?? "solidone-admin").trim();
   const dataDir = path.resolve(__dirname, "..", "data");
   const uploadsDir = path.join(dataDir, "uploads");
-  mkdirSync(uploadsDir, { recursive: true });
+  if (!useBlobStorage() && !process.env.VERCEL) {
+    try {
+      mkdirSync(uploadsDir, { recursive: true });
+    } catch {
+      // ignore on read-only filesystems
+    }
+  }
 
   function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
     if (!isAdminAuthorized(req.headers.authorization, ADMIN_PASSWORD)) {
@@ -139,7 +146,9 @@ export function createApp() {
     }),
   );
 
-  app.use("/uploads", express.static(uploadsDir));
+  if (!useBlobStorage()) {
+    app.use("/uploads", express.static(uploadsDir));
+  }
 
   registerBlogRoutes(app, { requireAdmin, uploadsDir });
 
