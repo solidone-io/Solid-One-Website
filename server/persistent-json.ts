@@ -33,9 +33,9 @@ export async function readJsonFile<T>(filename: string, fallback: T): Promise<T>
   const blobPath = `solid-one/${filename}`;
   const result = await list({ prefix: blobPath, limit: 1 });
   if (!result.blobs.length) return fallback;
-  const res = await fetch(result.blobs[0].url);
-  if (!res.ok) return fallback;
-  return (await res.json()) as T;
+  const httpRes = await fetch(result.blobs[0].url);
+  if (!httpRes.ok) return fallback;
+  return (await httpRes.json()) as T;
 }
 
 export async function writeJsonFile<T>(filename: string, data: T): Promise<void> {

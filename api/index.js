@@ -37,9 +37,9 @@ async function readJsonFile(filename, fallback) {
   const blobPath = `solid-one/${filename}`;
   const result = await list({ prefix: blobPath, limit: 1 });
   if (!result.blobs.length) return fallback;
-  const res = await fetch(result.blobs[0].url);
-  if (!res.ok) return fallback;
-  return await res.json();
+  const httpRes = await fetch(result.blobs[0].url);
+  if (!httpRes.ok) return fallback;
+  return await httpRes.json();
 }
 async function writeJsonFile(filename, data) {
   const body = JSON.stringify(data, null, 2);
@@ -339,7 +339,7 @@ import { z as z4 } from "zod";
 // server/async-route.ts
 function asyncRoute(handler2) {
   return (req, res, next) => {
-    void handler2(req, res).catch(next);
+    void handler2(req, res).catch((err) => next(err));
   };
 }
 
