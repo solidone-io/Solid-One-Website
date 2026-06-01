@@ -340,9 +340,9 @@ import path2 from "path";
 import { z as z4 } from "zod";
 
 // server/async-route.js
-function asyncRoute(handler) {
+function asyncRoute(handler2) {
   return (req, res, next) => {
-    void handler(req, res).catch(next);
+    void handler2(req, res).catch(next);
   };
 }
 
@@ -665,7 +665,9 @@ function createApp() {
 
 // api/src/index.ts
 var app = createApp();
-var index_default = app;
+function handler(req, res) {
+  app(req, res);
+}
 export {
-  index_default as default
+  handler as default
 };
