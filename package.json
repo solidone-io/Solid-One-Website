@@ -8,7 +8,7 @@
     "dev": "concurrently -k -n web,api \"pnpm dev:web\" \"pnpm dev:api\"",
     "dev:web": "vite --config vite.config.ts --host 0.0.0.0",
     "dev:api": "tsx watch server/index.ts",
-    "build": "vite build --config vite.config.ts && node scripts/build-api.mjs",
+    "build": "vite build --config vite.config.ts",
     "vercel-build": "pnpm run build",
     "start": "cross-env NODE_ENV=production tsx server/index.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
