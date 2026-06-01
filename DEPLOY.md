@@ -1,52 +1,25 @@
-# Deploy Solid One website to Vercel + GitHub
-
-## GitHub
+# Deploy Solid One website to Vercel
 
 Repository: https://github.com/solidone-io/Solid-One-Website.git
 
-From the monorepo root (`Solid-One-Solana`):
+## Vercel (Hobby)
 
-```bash
-git init
-git add .
-git commit -m "Solid One marketing site"
-git branch -M main
-git remote add origin https://github.com/Solid-One/Solid-One-Website.git
-git push -u origin main
-```
+1. **Delete** any failed import, then go to [vercel.com/new](https://vercel.com/new).
+2. Import **solidone-io/Solid-One-Website**.
+3. **Root Directory:** leave **empty** (do not set `artifacts/...`).
+4. **Framework Preset:** **Other**.
+5. Environment variables:
+   - `ADMIN_PASSWORD`
+   - `BLOB_READ_WRITE_TOKEN` (Storage → Blob → Connect)
+6. **Deploy**.
 
-Do **not** commit `.env` (secrets). Only commit `.env.example`.
-
-## Vercel project settings
-
-1. Import the GitHub repo at [vercel.com/new](https://vercel.com/new).
-2. **Root Directory:** leave **empty** (repo root — uses `/vercel.json`), **or** set `artifacts/solid-one-web` and click **Continue** after selecting it in the folder picker.
-3. Framework Preset: **Other** (do not use Vite preset).
-4. Add environment variables (Production + Preview):
-
-| Variable | Required | Notes |
-|----------|----------|--------|
-| `ADMIN_PASSWORD` | Yes | Strong password for `/admin1855` |
-| `BLOB_READ_WRITE_TOKEN` | Yes on Vercel | Storage → Blob → Connect to project |
-
-5. Deploy.
-
-## After deploy
-
-- Site: `https://your-project.vercel.app`
-- Admin: `https://your-project.vercel.app/admin1855`
-
-Blog posts, newsletter signups, support forms, and store notify emails are stored in **Vercel Blob** (JSON files + uploaded images). Local dev uses the `data/` folder instead.
-
-## Custom domain
-
-In Vercel → Project → Settings → Domains, add `solidone.io` and follow DNS instructions.
-
-## Local development
+## Local dev
 
 ```bash
 pnpm install
 pnpm run dev
 ```
+
+Copy `.env.example` to `.env` at the repo root.
 
 Web: http://localhost:5173 · API: http://localhost:3001
