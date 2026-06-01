@@ -1,7 +1,6 @@
 {
   "extends": "../tsconfig.base.json",
   "include": ["./**/*.ts", "../server/**/*.ts"],
-  "exclude": ["../server/db.ts", "../server/register-sqlite-routes.ts", "../server/schema.ts"],
   "compilerOptions": {
     "noEmit": false,
     "module": "NodeNext",

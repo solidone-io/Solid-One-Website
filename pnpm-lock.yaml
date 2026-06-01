@@ -99,6 +99,9 @@ importers:
       solana-icons:
         specifier: ^0.2.2
         version: 0.2.2(react@19.1.0)
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -289,9 +292,6 @@ importers:
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
       vaul:
         specifier: ^1.1.2
         version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
