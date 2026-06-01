@@ -35,8 +35,7 @@ node_modules
 # local API data
 data/
 
-# accidental local tsc output (Vercel compiles api/ itself)
-api/index.js
+# accidental local tsc output (API bundle is api/index.js — must NOT be gitignored or Vercel omits it)
 api/src/*.js
 server/*.js
 
