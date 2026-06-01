@@ -50,6 +50,10 @@ export function createApp() {
   app.use(cors({ origin: true }));
   app.use(express.json({ limit: "2mb" }));
 
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true });
+  });
+
   app.post(
     "/api/subscribe",
     asyncRoute(async (req, res) => {
