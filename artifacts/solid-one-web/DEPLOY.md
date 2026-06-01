@@ -2,7 +2,7 @@
 
 ## GitHub
 
-Repository: https://github.com/Solid-One/Solid-One-Website.git
+Repository: https://github.com/solidone-io/Solid-One-Website.git
 
 From the monorepo root (`Solid-One-Solana`):
 
@@ -20,8 +20,8 @@ Do **not** commit `.env` (secrets). Only commit `.env.example`.
 ## Vercel project settings
 
 1. Import the GitHub repo at [vercel.com/new](https://vercel.com/new).
-2. Set **Root Directory** to: `artifacts/solid-one-web`
-3. Framework Preset: **Other** (uses `vercel.json`).
+2. **Root Directory:** leave **empty** (repo root — uses `/vercel.json`), **or** set `artifacts/solid-one-web` and click **Continue** after selecting it in the folder picker.
+3. Framework Preset: **Other** (do not use Vite preset).
 4. Add environment variables (Production + Preview):
 
 | Variable | Required | Notes |

@@ -1,0 +1,16 @@
+{
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter @workspace/solid-one-web run build",
+  "outputDirectory": "artifacts/solid-one-web/dist/public",
+  "framework": null,
+  "functions": {
+    "artifacts/solid-one-web/api/index.ts": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/artifacts/solid-one-web/api" },
+    { "source": "/uploads/(.*)", "destination": "/artifacts/solid-one-web/api" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}
