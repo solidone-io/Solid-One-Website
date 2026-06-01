@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
+import { LegalMobileTocMenu } from "@/components/LegalMobileTocMenu";
 import { MarketingHeader } from "@/components/MarketingHeader";
+import { MobileMenuButton } from "@/components/MobileNavMenu";
 import { SiteFooter } from "@/components/SiteFooter";
 import type { LegalBlock } from "@/content/privacy-policy";
 import { sectionIdFromHeading, sectionsFromBlocks } from "@/lib/legal-sections";
@@ -73,6 +75,7 @@ export function LegalDocumentPage({
 }: LegalDocumentPageProps) {
   const sections = useMemo(() => sectionsFromBlocks(blocks), [blocks]);
   const [activeId, setActiveId] = useState<string | null>(sections[0]?.id ?? null);
+  const [tocMenuOpen, setTocMenuOpen] = useState(false);
   const hasNav = showSectionNav && sections.length > 0;
 
   const railRef = useRef<HTMLDivElement>(null);
@@ -153,6 +156,15 @@ export function LegalDocumentPage({
 
       <MarketingHeader />
 
+      {hasNav && (
+        <LegalMobileTocMenu
+          open={tocMenuOpen}
+          onClose={() => setTocMenuOpen(false)}
+          sections={sections}
+          activeId={activeId}
+        />
+      )}
+
       <main className="relative z-10 pt-28 md:pt-32 pb-8">
         <div className="px-6 md:px-10 flex justify-center">
           <div className={`w-full ${hasNav ? "max-w-[1000px]" : "max-w-3xl"}`}>
@@ -180,22 +192,13 @@ export function LegalDocumentPage({
 
               <div className="min-w-0 flex-1">
                 {hasNav && (
-                  <div className="lg:hidden mb-6 -mx-1 overflow-x-auto pb-1">
-                    <div className="flex gap-2 px-1 min-w-min">
-                      {sections.map((section) => (
-                        <a
-                          key={section.id}
-                          href={`#${section.id}`}
-                          className={`shrink-0 rounded-full px-3.5 py-1.5 text-[12px] border transition-colors ${
-                            activeId === section.id
-                              ? "bg-white text-black border-white"
-                              : "border-white/15 text-white/50 hover:text-white"
-                          }`}
-                        >
-                          {section.number}. {section.label}
-                        </a>
-                      ))}
-                    </div>
+                  <div className="lg:hidden mb-6 flex items-center justify-between gap-4 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
+                    <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-white/40">On this page</p>
+                    <MobileMenuButton
+                      open={tocMenuOpen}
+                      className="mobile-menu-btn flex shrink-0"
+                      onToggle={() => setTocMenuOpen((v) => !v)}
+                    />
                   </div>
                 )}
 

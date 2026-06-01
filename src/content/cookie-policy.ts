@@ -2,8 +2,8 @@ import type { LegalBlock } from "@/content/privacy-policy";
 
 export const COOKIE_POLICY_META = {
   title: "COOKIE POLICY",
-  effectiveDate: "28 May 2026",
-  lastUpdated: "28 May 2026",
+  effectiveDate: "01 June 2026",
+  lastUpdated: "01 June 2026",
 };
 
 export const COOKIE_POLICY_BLOCKS: LegalBlock[] = [

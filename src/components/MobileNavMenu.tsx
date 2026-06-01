@@ -41,14 +41,16 @@ type MobileNavMenuProps = {
 export function MobileMenuButton({
   open,
   onToggle,
+  className,
 }: {
   open: boolean;
   onToggle: () => void;
+  className?: string;
 }) {
   return (
     <button
       type="button"
-      className="mobile-menu-btn hidden max-md:flex"
+      className={className ?? "mobile-menu-btn hidden max-md:flex"}
       aria-label={open ? "Close menu" : "Open menu"}
       aria-expanded={open}
       onClick={onToggle}

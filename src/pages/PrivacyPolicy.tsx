@@ -15,13 +15,13 @@ export default function PrivacyPolicy() {
               Glider Web3 Solution Pvt. Ltd.{"\n"}
               Registered office: 541, K9, Kalinga Nagar, Bhubaneswar, 751003, India{"\n\n"}
               Email (legal):{" "}
-              <a href="mailto:legal@glider.world" className="text-white/85 font-semibold hover:text-white underline underline-offset-2">
-                legal@glider.world
+              <a href="mailto:legal@solidone.io" className="text-white/85 font-semibold hover:text-white underline underline-offset-2">
+                legal@solidone.io
               </a>
               {"\n"}
               Email (operations):{" "}
-              <a href="mailto:operations@glider.world" className="text-white/85 font-semibold hover:text-white underline underline-offset-2">
-                operations@glider.world
+              <a href="mailto:operations@solidone.io" className="text-white/85 font-semibold hover:text-white underline underline-offset-2">
+                operations@solidone.io
               </a>
             </p>
           </div>

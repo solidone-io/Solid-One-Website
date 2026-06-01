@@ -2,8 +2,8 @@ export type LegalBlock = { type: "h2" | "p"; text: string };
 
 export const PRIVACY_POLICY_META = {
   title: "PRIVACY POLICY",
-  effectiveDate: "28 May 2026",
-  lastUpdated: "28 May 2026",
+  effectiveDate: "01 June 2026",
+  lastUpdated: "01 June 2026",
 };
 
 export const PRIVACY_POLICY_BLOCKS: LegalBlock[] = [
