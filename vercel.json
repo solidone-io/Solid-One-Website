@@ -2,7 +2,15 @@
   "installCommand": "pnpm install",
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist/public",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 30,
+      "includeFiles": "server/**"
+    }
+  },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/uploads/(.*)", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
