@@ -1,6 +1,3 @@
-// api-src/index.ts
-import "dotenv/config";
-
 // server/app.ts
 import express from "express";
 import cors from "cors";
@@ -731,8 +728,19 @@ function createApp() {
 }
 
 // api-src/index.ts
-var app = createApp();
+var app;
 function handler(req, res) {
+  if (!app) {
+    try {
+      app = createApp();
+    } catch (err) {
+      console.error("createApp failed:", err);
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ error: "Server failed to start." }));
+      return;
+    }
+  }
   app(req, res);
 }
 export {
