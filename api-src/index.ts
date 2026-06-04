@@ -9,10 +9,16 @@ export default function handler(req: IncomingMessage, res: ServerResponse) {
     try {
       app = createApp();
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error("createApp failed:", err);
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ error: "Server failed to start." }));
+      res.end(
+        JSON.stringify({
+          error: "Server failed to start.",
+          detail: process.env.VERCEL ? message : undefined,
+        }),
+      );
       return;
     }
   }

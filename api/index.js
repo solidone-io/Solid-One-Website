@@ -454,7 +454,7 @@ function postValidationError(error) {
 }
 function registerBlogRoutes(app2, { requireAdmin, uploadsDir }) {
   const upload = multer({
-    storage: useBlobStorage() ? multer.memoryStorage() : multer.diskStorage({
+    storage: useBlobStorage() || process.env.VERCEL ? multer.memoryStorage() : multer.diskStorage({
       destination: uploadsDir,
       filename: (_req, file, cb) => {
         const ext = path2.extname(file.originalname).toLowerCase() || ".jpg";
@@ -610,6 +610,476 @@ function registerBlogRoutes(app2, { requireAdmin, uploadsDir }) {
   );
 }
 
+// server/download-handler.ts
+import { z as z5 } from "zod";
+
+// server/google-fetch.ts
+import https from "node:https";
+function devInsecureTls() {
+  return process.env.NODE_ENV !== "production" && process.env.DOWNLOAD_DEV_INSECURE_TLS?.trim() === "1";
+}
+function httpsGetInsecure(url) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    https.get(
+      {
+        hostname: u.hostname,
+        path: `${u.pathname}${u.search}`,
+        rejectUnauthorized: false
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        res.on("end", () => {
+          resolve(
+            new Response(Buffer.concat(chunks), {
+              status: res.statusCode ?? 500,
+              headers: {
+                "content-type": String(res.headers["content-type"] ?? "application/json")
+              }
+            })
+          );
+        });
+      }
+    ).on("error", reject);
+  });
+}
+function fetchGoogle(url) {
+  if (devInsecureTls()) return httpsGetInsecure(url);
+  return fetch(url);
+}
+function googleFetchSslHint(cause) {
+  const code = cause && typeof cause === "object" && "code" in cause ? String(cause.code) : "";
+  if (code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" || code === "CERT_HAS_EXPIRED") {
+    return "Local SSL inspection is blocking Google. Add DOWNLOAD_DEV_INSECURE_TLS=1 to .env (dev only), restart pnpm run dev, or fix antivirus HTTPS scanning.";
+  }
+  return null;
+}
+
+// server/download-jwt.ts
+import { createHmac, timingSafeEqual } from "crypto";
+function b64url(data) {
+  return Buffer.from(data, "utf8").toString("base64url");
+}
+function fromB64url(data) {
+  return Buffer.from(data, "base64url").toString("utf8");
+}
+function signDownloadSession(user, secret, days = 30) {
+  const payload = {
+    ...user,
+    exp: Math.floor(Date.now() / 1e3) + days * 86400
+  };
+  const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const body = b64url(JSON.stringify(payload));
+  const sig = createHmac("sha256", secret).update(`${header}.${body}`).digest("base64url");
+  return `${header}.${body}.${sig}`;
+}
+function verifyDownloadSession(token, secret) {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [header, body, sig] = parts;
+  const expected = createHmac("sha256", secret).update(`${header}.${body}`).digest("base64url");
+  try {
+    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  } catch {
+    return null;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(fromB64url(body));
+  } catch {
+    return null;
+  }
+  if (!payload.sub || !payload.name) return null;
+  if (payload.exp && payload.exp < Math.floor(Date.now() / 1e3)) return null;
+  return {
+    sub: payload.sub,
+    name: payload.name,
+    picture: payload.picture ?? "",
+    email: payload.email ?? ""
+  };
+}
+
+// server/download-store.ts
+var FILE5 = "download-store.json";
+var EMPTY = {
+  nextReviewId: 1,
+  installs: [],
+  reviews: []
+};
+async function readStore() {
+  const raw = await readJsonFile(FILE5, EMPTY);
+  if (!raw || typeof raw !== "object") return { ...EMPTY };
+  return {
+    nextReviewId: typeof raw.nextReviewId === "number" ? raw.nextReviewId : 1,
+    installs: Array.isArray(raw.installs) ? raw.installs.filter((s) => typeof s === "string") : [],
+    reviews: Array.isArray(raw.reviews) ? raw.reviews.filter(isReview) : []
+  };
+}
+function isReview(row) {
+  if (!row || typeof row !== "object") return false;
+  const r = row;
+  return typeof r.id === "number" && typeof r.googleSub === "string" && typeof r.userName === "string" && typeof r.stars === "number" && typeof r.createdAt === "string";
+}
+async function writeStore(data) {
+  await writeJsonFile(FILE5, data);
+}
+function computeStats(reviews, installCount) {
+  const visible = reviews.filter((r) => !r.flagged);
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  for (const r of visible) {
+    const s = Math.min(5, Math.max(1, Math.round(r.stars)));
+    distribution[s]++;
+  }
+  const reviewCount = visible.length;
+  const averageRating = reviewCount === 0 ? 0 : visible.reduce((sum, r) => sum + r.stars, 0) / reviewCount;
+  return {
+    downloadCount: installCount,
+    reviewCount,
+    averageRating: Math.round(averageRating * 10) / 10,
+    distribution
+  };
+}
+async function getDownloadStats() {
+  const store = await readStore();
+  return computeStats(store.reviews, store.installs.length);
+}
+async function recordInstall(googleSub) {
+  const store = await readStore();
+  const alreadyInstalled = store.installs.includes(googleSub);
+  if (!alreadyInstalled) {
+    store.installs.push(googleSub);
+    await writeStore(store);
+  }
+  return {
+    alreadyInstalled,
+    stats: computeStats(store.reviews, store.installs.length)
+  };
+}
+async function getReviewByUser(googleSub) {
+  const store = await readStore();
+  return store.reviews.find((r) => r.googleSub === googleSub && !r.flagged) ?? null;
+}
+async function addReview(input) {
+  const store = await readStore();
+  const existing = store.reviews.find((r) => r.googleSub === input.googleSub && !r.flagged);
+  if (existing) {
+    return { ok: false, error: "You have already reviewed this app." };
+  }
+  const review = {
+    id: store.nextReviewId++,
+    googleSub: input.googleSub,
+    userName: input.userName,
+    userPicture: input.userPicture,
+    stars: input.stars,
+    text: input.text.trim(),
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    helpfulYes: 0,
+    helpfulNo: 0,
+    helpfulVoters: [],
+    flagged: false,
+    flagReason: null
+  };
+  store.reviews.unshift(review);
+  await writeStore(store);
+  return { ok: true, review };
+}
+async function listReviews(options) {
+  const store = await readStore();
+  let rows = store.reviews.filter((r) => !r.flagged);
+  const q = options.search?.trim().toLowerCase();
+  if (q) {
+    rows = rows.filter(
+      (r) => r.userName.toLowerCase().includes(q) || r.text.toLowerCase().includes(q)
+    );
+  }
+  if (options.filter === "positive") rows = rows.filter((r) => r.stars >= 4);
+  else if (options.filter === "negative") rows = rows.filter((r) => r.stars <= 2);
+  else if (options.filter === "neutral") rows = rows.filter((r) => r.stars === 3);
+  const total = rows.length;
+  const reviews = rows.slice(options.offset, options.offset + options.limit);
+  return { reviews, total };
+}
+async function setReviewHelpful(reviewId, googleSub, helpful) {
+  const store = await readStore();
+  const review = store.reviews.find((r) => r.id === reviewId && !r.flagged);
+  if (!review) return { ok: false, error: "Review not found." };
+  if (review.helpfulVoters.includes(googleSub)) {
+    return { ok: false, error: "You already voted on this review." };
+  }
+  review.helpfulVoters.push(googleSub);
+  if (helpful) review.helpfulYes++;
+  else review.helpfulNo++;
+  await writeStore(store);
+  return { ok: true };
+}
+async function flagReview(reviewId, reason) {
+  const store = await readStore();
+  const review = store.reviews.find((r) => r.id === reviewId);
+  if (!review) return { ok: false };
+  review.flagged = true;
+  review.flagReason = reason;
+  await writeStore(store);
+  return { ok: true };
+}
+function serializeReview(r) {
+  return {
+    id: r.id,
+    userName: r.userName,
+    userPicture: r.userPicture,
+    stars: r.stars,
+    text: r.text,
+    createdAt: r.createdAt,
+    helpfulYes: r.helpfulYes,
+    helpfulNo: r.helpfulNo
+  };
+}
+
+// server/download-handler.ts
+function jwtSecret() {
+  return process.env.DOWNLOAD_JWT_SECRET?.trim() || process.env.ADMIN_PASSWORD?.trim() || "solidone-download-dev-secret";
+}
+function googleClientId() {
+  return process.env.GOOGLE_CLIENT_ID?.trim() || process.env.VITE_GOOGLE_CLIENT_ID?.trim() || "";
+}
+function sessionFromAuthHeader(authHeader) {
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) return null;
+  return verifyDownloadSession(token, jwtSecret());
+}
+function validationError2(error) {
+  return error.issues[0]?.message ?? "Invalid request.";
+}
+function audienceMatches(payload, clientId) {
+  if (!clientId) return false;
+  if (payload.azp === clientId) return true;
+  if (payload.aud === clientId) return true;
+  if (payload.aud?.split(",").map((s) => s.trim()).includes(clientId)) return true;
+  return false;
+}
+function decodeGoogleIdTokenPayload(idToken) {
+  try {
+    const part = idToken.split(".")[1];
+    if (!part) return null;
+    return JSON.parse(Buffer.from(part, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+async function verifyGoogleIdToken(idToken) {
+  const clientId = googleClientId();
+  if (!clientId) {
+    return { ok: false, error: "GOOGLE_CLIENT_ID is missing in server .env \u2014 restart pnpm run dev." };
+  }
+  const endpoints = [
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+    `https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=${encodeURIComponent(idToken)}`
+  ];
+  let lastError = "Google could not verify the sign-in token.";
+  for (const url of endpoints) {
+    let res;
+    try {
+      res = await fetchGoogle(url);
+    } catch (err) {
+      const sslHint = googleFetchSslHint(err instanceof Error ? err.cause : err);
+      return {
+        ok: false,
+        error: sslHint ?? "Server cannot reach Google. Check your internet connection and try again."
+      };
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      lastError = data.error_description || data.error || `Google rejected the token (${res.status}). Sign in again from http://localhost:5173/download`;
+      continue;
+    }
+    if (!data.sub) {
+      lastError = "Google token is missing user id.";
+      continue;
+    }
+    if (!audienceMatches(data, clientId)) {
+      return {
+        ok: false,
+        error: `Client ID mismatch. Console has ${clientId.slice(0, 12)}\u2026 but token aud=${data.aud ?? "?"} azp=${data.azp ?? "?"}. Check .env matches Google Console exactly.`
+      };
+    }
+    const claims = decodeGoogleIdTokenPayload(idToken);
+    return {
+      ok: true,
+      user: {
+        sub: data.sub,
+        name: data.name ?? claims?.name ?? "User",
+        picture: data.picture ?? claims?.picture ?? "",
+        email: data.email ?? claims?.email ?? ""
+      }
+    };
+  }
+  return { ok: false, error: lastError };
+}
+async function handleDownloadGoogleAuth(body) {
+  const parsed = z5.object({ credential: z5.string().min(10) }).safeParse(body);
+  if (!parsed.success) {
+    return { status: 400, json: { error: validationError2(parsed.error) } };
+  }
+  const verified = await verifyGoogleIdToken(parsed.data.credential);
+  if (!verified.ok) {
+    return { status: 401, json: { error: verified.error } };
+  }
+  const token = signDownloadSession(verified.user, jwtSecret());
+  return { status: 200, json: { ok: true, token, user: verified.user } };
+}
+async function handleDownloadStatsGet() {
+  const stats = await getDownloadStats();
+  return { status: 200, json: { ok: true, stats } };
+}
+async function handleDownloadInstall(session) {
+  if (!session) return { status: 401, json: { error: "Sign in required." } };
+  const result = await recordInstall(session.sub);
+  return {
+    status: 200,
+    json: { ok: true, alreadyInstalled: result.alreadyInstalled, stats: result.stats }
+  };
+}
+async function handleDownloadMyReviewGet(session) {
+  if (!session) return { status: 401, json: { error: "Sign in required." } };
+  const review = await getReviewByUser(session.sub);
+  return {
+    status: 200,
+    json: { ok: true, review: review ? serializeReview(review) : null }
+  };
+}
+async function handleDownloadReviewsGet(query) {
+  const limit = Math.min(50, Math.max(1, Number(query.limit) || 5));
+  const offset = Math.max(0, Number(query.offset) || 0);
+  const filterRaw = typeof query.filter === "string" ? query.filter : "all";
+  const filter = filterRaw === "positive" || filterRaw === "negative" || filterRaw === "neutral" ? filterRaw : "all";
+  const search = typeof query.search === "string" ? query.search : void 0;
+  const { reviews, total } = await listReviews({ limit, offset, filter, search });
+  const stats = await getDownloadStats();
+  return {
+    status: 200,
+    json: {
+      ok: true,
+      reviews: reviews.map(serializeReview),
+      total,
+      stats
+    }
+  };
+}
+async function handleDownloadReviewPost(session, body) {
+  if (!session) return { status: 401, json: { error: "Sign in required." } };
+  const parsed = z5.object({
+    stars: z5.number().int().min(1).max(5),
+    text: z5.string().max(500).optional().default("")
+  }).safeParse(body);
+  if (!parsed.success) {
+    return { status: 400, json: { error: validationError2(parsed.error) } };
+  }
+  const result = await addReview({
+    googleSub: session.sub,
+    userName: session.name,
+    userPicture: session.picture,
+    stars: parsed.data.stars,
+    text: parsed.data.text
+  });
+  if (!result.ok) {
+    return { status: 409, json: { error: "error" in result ? result.error : "Review failed." } };
+  }
+  const stats = await getDownloadStats();
+  return {
+    status: 200,
+    json: { ok: true, review: serializeReview(result.review), stats }
+  };
+}
+async function handleDownloadReviewHelpful(session, reviewId, body) {
+  if (!session) return { status: 401, json: { error: "Sign in required." } };
+  const parsed = z5.object({ helpful: z5.boolean() }).safeParse(body);
+  if (!parsed.success) {
+    return { status: 400, json: { error: validationError2(parsed.error) } };
+  }
+  const result = await setReviewHelpful(reviewId, session.sub, parsed.data.helpful);
+  if (!result.ok) {
+    return { status: 400, json: { error: result.error ?? "Could not record vote." } };
+  }
+  return { status: 200, json: { ok: true } };
+}
+async function handleDownloadReviewFlag(reviewId, body) {
+  const parsed = z5.object({ reason: z5.enum(["spam", "inappropriate"]) }).safeParse(body);
+  if (!parsed.success) {
+    return { status: 400, json: { error: validationError2(parsed.error) } };
+  }
+  await flagReview(reviewId, parsed.data.reason);
+  const stats = await getDownloadStats();
+  return { status: 200, json: { ok: true, stats } };
+}
+
+// server/register-download-routes.ts
+function registerDownloadRoutes(app2) {
+  app2.get(
+    "/api/download/stats",
+    asyncRoute(async (_req, res) => {
+      const { status, json } = await handleDownloadStatsGet();
+      res.status(status).json(json);
+    })
+  );
+  app2.get(
+    "/api/download/my-review",
+    asyncRoute(async (req, res) => {
+      const { status, json } = await handleDownloadMyReviewGet(sessionFromAuthHeader(req.headers.authorization));
+      res.status(status).json(json);
+    })
+  );
+  app2.get(
+    "/api/download/reviews",
+    asyncRoute(async (req, res) => {
+      const query = req.query;
+      const { status, json } = await handleDownloadReviewsGet(query);
+      res.status(status).json(json);
+    })
+  );
+  app2.post(
+    "/api/download/auth/google",
+    asyncRoute(async (req, res) => {
+      const { status, json } = await handleDownloadGoogleAuth(req.body);
+      res.status(status).json(json);
+    })
+  );
+  app2.post(
+    "/api/download/install",
+    asyncRoute(async (req, res) => {
+      const { status, json } = await handleDownloadInstall(sessionFromAuthHeader(req.headers.authorization));
+      res.status(status).json(json);
+    })
+  );
+  app2.post(
+    "/api/download/reviews",
+    asyncRoute(async (req, res) => {
+      const { status, json } = await handleDownloadReviewPost(
+        sessionFromAuthHeader(req.headers.authorization),
+        req.body
+      );
+      res.status(status).json(json);
+    })
+  );
+  app2.post(
+    "/api/download/reviews/:id/helpful",
+    asyncRoute(async (req, res) => {
+      const { status, json } = await handleDownloadReviewHelpful(
+        sessionFromAuthHeader(req.headers.authorization),
+        Number(req.params.id),
+        req.body
+      );
+      res.status(status).json(json);
+    })
+  );
+  app2.post(
+    "/api/download/reviews/:id/flag",
+    asyncRoute(async (req, res) => {
+      const { status, json } = await handleDownloadReviewFlag(Number(req.params.id), req.body);
+      res.status(status).json(json);
+    })
+  );
+}
+
 // server/app.ts
 var __dirname2 = path3.dirname(fileURLToPath2(import.meta.url));
 function createApp() {
@@ -724,6 +1194,7 @@ function createApp() {
     app2.use("/uploads", express.static(uploadsDir));
   }
   registerBlogRoutes(app2, { requireAdmin, uploadsDir });
+  registerDownloadRoutes(app2);
   return app2;
 }
 
@@ -734,10 +1205,16 @@ function handler(req, res) {
     try {
       app = createApp();
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error("createApp failed:", err);
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ error: "Server failed to start." }));
+      res.end(
+        JSON.stringify({
+          error: "Server failed to start.",
+          detail: process.env.VERCEL ? message : void 0
+        })
+      );
       return;
     }
   }

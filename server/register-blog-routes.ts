@@ -54,7 +54,7 @@ type RegisterOptions = {
 
 export function registerBlogRoutes(app: express.Express, { requireAdmin, uploadsDir }: RegisterOptions) {
   const upload = multer({
-    storage: useBlobStorage()
+    storage: useBlobStorage() || process.env.VERCEL
       ? multer.memoryStorage()
       : multer.diskStorage({
           destination: uploadsDir,
