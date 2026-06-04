@@ -24,6 +24,7 @@ import { registerBlogRoutes } from "./register-blog-routes.js";
 import { registerDownloadRoutes } from "./register-download-routes.js";
 import { asyncRoute } from "./async-route.js";
 import { useBlobStorage } from "./persistent-json.js";
+import { isVercelRuntime } from "./runtime.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,7 +32,7 @@ export function createApp() {
   const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD ?? "solidone-admin").trim();
   const dataDir = path.resolve(__dirname, "..", "data");
   const uploadsDir = path.join(dataDir, "uploads");
-  if (!useBlobStorage() && !process.env.VERCEL) {
+  if (!useBlobStorage() && !isVercelRuntime()) {
     try {
       mkdirSync(uploadsDir, { recursive: true });
     } catch {

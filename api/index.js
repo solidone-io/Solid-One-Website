@@ -12,13 +12,20 @@ import { z } from "zod";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
+// server/runtime.ts
+function isVercelRuntime() {
+  return Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+}
+
+// server/persistent-json.ts
 var __dirname = path.dirname(fileURLToPath(import.meta.url));
 var dataDir = path.resolve(__dirname, "..", "data");
 function useBlobStorage() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 function ensureLocalDataDir() {
-  if (useBlobStorage() || process.env.VERCEL) return;
+  if (useBlobStorage() || isVercelRuntime()) return;
   try {
     mkdirSync(dataDir, { recursive: true });
   } catch {
@@ -454,7 +461,7 @@ function postValidationError(error) {
 }
 function registerBlogRoutes(app2, { requireAdmin, uploadsDir }) {
   const upload = multer({
-    storage: useBlobStorage() || process.env.VERCEL ? multer.memoryStorage() : multer.diskStorage({
+    storage: useBlobStorage() || isVercelRuntime() ? multer.memoryStorage() : multer.diskStorage({
       destination: uploadsDir,
       filename: (_req, file, cb) => {
         const ext = path2.extname(file.originalname).toLowerCase() || ".jpg";
@@ -1086,7 +1093,7 @@ function createApp() {
   const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD ?? "solidone-admin").trim();
   const dataDir2 = path3.resolve(__dirname2, "..", "data");
   const uploadsDir = path3.join(dataDir2, "uploads");
-  if (!useBlobStorage() && !process.env.VERCEL) {
+  if (!useBlobStorage() && !isVercelRuntime()) {
     try {
       mkdirSync2(uploadsDir, { recursive: true });
     } catch {
@@ -1200,21 +1207,24 @@ function createApp() {
 
 // api-src/index.ts
 var app;
+function fail(res, err) {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error("createApp failed:", err);
+  res.statusCode = 500;
+  res.setHeader("Content-Type", "application/json");
+  res.end(
+    JSON.stringify({
+      error: "Server failed to start.",
+      detail: message || "Unknown error"
+    })
+  );
+}
 function handler(req, res) {
   if (!app) {
     try {
       app = createApp();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error("createApp failed:", err);
-      res.statusCode = 500;
-      res.setHeader("Content-Type", "application/json");
-      res.end(
-        JSON.stringify({
-          error: "Server failed to start.",
-          detail: process.env.VERCEL ? message : void 0
-        })
-      );
+      fail(res, err);
       return;
     }
   }

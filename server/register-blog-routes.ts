@@ -16,6 +16,7 @@ import {
 } from "./blog-store.js";
 import { serializePost, slugify, uniqueSlug } from "./blog-utils.js";
 import { saveUploadedImage, useBlobStorage } from "./persistent-json.js";
+import { isVercelRuntime } from "./runtime.js";
 
 function htmlHasText(html: string): boolean {
   return html.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim().length > 0;
@@ -54,7 +55,7 @@ type RegisterOptions = {
 
 export function registerBlogRoutes(app: express.Express, { requireAdmin, uploadsDir }: RegisterOptions) {
   const upload = multer({
-    storage: useBlobStorage() || process.env.VERCEL
+    storage: useBlobStorage() || isVercelRuntime()
       ? multer.memoryStorage()
       : multer.diskStorage({
           destination: uploadsDir,

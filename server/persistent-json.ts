@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { isVercelRuntime } from "./runtime.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(__dirname, "..", "data");
@@ -11,7 +12,7 @@ export function useBlobStorage(): boolean {
 
 /** Local dev only — Vercel serverless has a read-only project filesystem. */
 function ensureLocalDataDir(): void {
-  if (useBlobStorage() || process.env.VERCEL) return;
+  if (useBlobStorage() || isVercelRuntime()) return;
   try {
     mkdirSync(dataDir, { recursive: true });
   } catch {
