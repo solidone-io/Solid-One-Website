@@ -31,6 +31,10 @@ const MENU_SECTIONS = [
       { label: "GitHub", href: "/developers" },
     ],
   },
+  {
+    title: "Get the app",
+    links: [{ label: "Download", href: "/download" }],
+  },
 ] as const;
 
 type MobileNavMenuProps = {
@@ -50,7 +54,7 @@ export function MobileMenuButton({
   return (
     <button
       type="button"
-      className={className ?? "mobile-menu-btn hidden max-md:flex"}
+      className={className ?? "mobile-menu-btn md:hidden"}
       aria-label={open ? "Close menu" : "Open menu"}
       aria-expanded={open}
       onClick={onToggle}
@@ -87,15 +91,24 @@ export function MobileNavMenu({ open, onClose }: MobileNavMenuProps) {
     <AnimatePresence>
       {open && (
         <>
+          <motion.button
+            type="button"
+            aria-label="Close menu"
+            className="fixed inset-0 z-[55] bg-black/70 md:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
           <motion.aside
-            className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col bg-[#080808] backdrop-blur-xl md:hidden"
+            className="fixed inset-y-0 right-0 z-[58] flex h-[100dvh] w-[min(100%,20rem)] max-w-[85vw] flex-col border-l border-white/10 bg-[#080808] shadow-2xl md:hidden"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 380, damping: 36 }}
           >
-            <div className="flex items-center justify-between border-b border-white/8 px-6 py-4">
-              <a href="/" onClick={onClose}>
+            <div className="flex items-center justify-between gap-3 border-b border-white/8 px-6 py-4">
+              <a href="/" onClick={onClose} className="shrink-0">
                 <img src={logoImg} alt="Solid One" className="h-7 w-auto" draggable={false} />
               </a>
               <MobileMenuButton open onToggle={onClose} />

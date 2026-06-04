@@ -52,6 +52,12 @@ export function storeNotifyDevPlugin(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const pathname = req.url?.split("?")[0] ?? "";
 
+        // Download API runs on Express (port 3001) — avoid parsing body here (breaks Google auth POST)
+        if (pathname.startsWith("/api/download")) {
+          next();
+          return;
+        }
+
         if (pathname === "/api/admin/login" && req.method === "POST") {
           try {
             const body = (await readJsonBody(req)) as { password?: string };

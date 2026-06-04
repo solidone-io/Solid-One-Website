@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n web,api \"pnpm dev:web\" \"pnpm dev:api\"",
+    "dev:mobile": "adb reverse tcp:5173 tcp:5173 && adb reverse tcp:3001 tcp:3001",
     "dev:web": "vite --config vite.config.ts --host 0.0.0.0",
     "dev:api": "tsx watch server/index.ts",
     "build": "vite build --config vite.config.ts && node scripts/build-api.mjs",

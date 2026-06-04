@@ -342,10 +342,10 @@ export default function Home() {
 
       {/* ── Header ── */}
       <header className={`fixed top-0 left-0 right-0 z-[60] transition-all duration-500 ${isScrolled || mobileMenuOpen ? "bg-[#050505]/90 backdrop-blur-lg border-b border-white/6 py-4" : "bg-transparent py-6"}`}>
-        <div className="max-w-7xl mx-auto px-6 md:px-10 flex items-center justify-between">
-          <img src={logoImg} alt="Solid One" className="h-8 w-auto" />
+        <div className="max-w-7xl mx-auto flex w-full items-center justify-between gap-3 px-6 md:px-10">
+          <img src={logoImg} alt="Solid One" className="h-8 w-auto shrink-0" />
 
-          <nav className="hidden md:flex items-center gap-8 text-[13px] font-medium tracking-wide text-white/60">
+          <nav className="hidden md:flex flex-1 items-center justify-center gap-8 text-[13px] font-medium tracking-wide text-white/60">
             {[
               {
                 label: "Company",
@@ -409,7 +409,9 @@ export default function Home() {
             </div>
           </div>
 
-          <MobileMenuButton open={mobileMenuOpen} onToggle={() => setMobileMenuOpen((v) => !v)} />
+          <div className="shrink-0 md:hidden">
+            <MobileMenuButton open={mobileMenuOpen} onToggle={() => setMobileMenuOpen((v) => !v)} />
+          </div>
         </div>
       </header>
 
