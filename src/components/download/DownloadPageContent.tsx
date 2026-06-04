@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronDown,
@@ -8,6 +9,7 @@ import {
   MoreVertical,
   Search,
   Star,
+  X,
 } from "lucide-react";
 import { DOWNLOAD_APP } from "@/content/download-app";
 import { Button } from "@/components/ui/button";
@@ -199,10 +201,62 @@ function visibleScreenshotsCount(): number {
 }
 
 function ScreenshotCarousel() {
+  const screenshots = DOWNLOAD_APP.screenshots;
   const viewportRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lightboxScrollRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef({ active: false, startX: 0, scrollLeft: 0, moved: false });
+  const tapRef = useRef({ x: 0, y: 0, moved: false });
   const [cardWidth, setCardWidth] = useState(0);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const isScreenshotCard = (target: EventTarget | null) =>
+    target instanceof Element && Boolean(target.closest("[data-screenshot-card]"));
+
+  const scrollLightboxTo = useCallback((index: number) => {
+    const el = lightboxScrollRef.current;
+    if (!el) return;
+    const slide = el.children[index] as HTMLElement | undefined;
+    slide?.scrollIntoView({ inline: "center", behavior: "smooth" });
+  }, []);
+
+  const openLightbox = (index: number) => {
+    setLightboxIndex(index);
+  };
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const id = requestAnimationFrame(() => scrollLightboxTo(lightboxIndex));
+    return () => cancelAnimationFrame(id);
+  }, [lightboxIndex, scrollLightboxTo]);
+
+  const stepLightbox = useCallback(
+    (direction: -1 | 1) => {
+      setLightboxIndex((current) => {
+        if (current === null) return null;
+        const next = (current + direction + screenshots.length) % screenshots.length;
+        requestAnimationFrame(() => scrollLightboxTo(next));
+        return next;
+      });
+    },
+    [screenshots.length, scrollLightboxTo],
+  );
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft") stepLightbox(-1);
+      if (e.key === "ArrowRight") stepLightbox(1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [lightboxIndex, stepLightbox]);
 
   useEffect(() => {
     const measure = () => {
@@ -234,9 +288,11 @@ function ScreenshotCarousel() {
 
   const onTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
-    if (!el || e.button !== 0 || e.pointerType !== "mouse") return;
-    dragRef.current = { active: true, startX: e.clientX, scrollLeft: el.scrollLeft, moved: false };
-    el.setPointerCapture(e.pointerId);
+    if (!el || e.button !== 0 || isScreenshotCard(e.target)) return;
+    if (e.pointerType === "mouse") {
+      dragRef.current = { active: true, startX: e.clientX, scrollLeft: el.scrollLeft, moved: false };
+      el.setPointerCapture(e.pointerId);
+    }
   };
 
   const onTrackPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -268,20 +324,40 @@ function ScreenshotCarousel() {
           onPointerUp={endTrackDrag}
           onPointerCancel={endTrackDrag}
         >
-          {DOWNLOAD_APP.screenshots.map((shot, i) => (
-            <div
+          {screenshots.map((shot, i) => (
+            <button
               key={i}
+              type="button"
               data-screenshot-card
-              className="shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a]"
+              aria-label={`View ${shot.alt}`}
+              className="shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a] cursor-pointer text-left transition-opacity hover:opacity-95 touch-manipulation"
               style={{ width: cardWidth || undefined }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                tapRef.current = { x: e.clientX, y: e.clientY, moved: false };
+              }}
+              onPointerMove={(e) => {
+                if (
+                  Math.hypot(e.clientX - tapRef.current.x, e.clientY - tapRef.current.y) > 10
+                ) {
+                  tapRef.current.moved = true;
+                }
+              }}
+              onPointerUp={(e) => {
+                e.stopPropagation();
+                if (!tapRef.current.moved) openLightbox(i);
+              }}
+              onPointerCancel={(e) => {
+                e.stopPropagation();
+              }}
             >
               <img
                 src={shot.src}
                 alt={shot.alt}
-                className="block w-full h-auto rounded-2xl"
+                className="block w-full h-auto rounded-2xl pointer-events-none"
                 draggable={false}
               />
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -302,6 +378,96 @@ function ScreenshotCarousel() {
       >
         <ChevronRight className="h-5 w-5" />
       </button>
+
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {lightboxIndex !== null && (
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Screenshot viewer"
+                className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 px-4 py-10"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setLightboxIndex(null)}
+              >
+            <button
+              type="button"
+              aria-label="Close"
+              className="absolute top-4 right-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[#141414]/90 text-white/80 hover:bg-white/10 hover:text-white"
+              onClick={() => setLightboxIndex(null)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {screenshots.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous image"
+                  className="absolute left-2 md:left-6 top-1/2 z-20 -translate-y-1/2 hidden md:flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[#141414]/90 text-white/80 hover:bg-white/10 hover:text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    stepLightbox(-1);
+                  }}
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next image"
+                  className="absolute right-2 md:right-6 top-1/2 z-20 -translate-y-1/2 hidden md:flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[#141414]/90 text-white/80 hover:bg-white/10 hover:text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    stepLightbox(1);
+                  }}
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </>
+            )}
+
+            <div
+              className="relative w-full max-w-[min(92vw,480px)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                ref={lightboxScrollRef}
+                className="flex overflow-x-auto snap-x snap-mandatory touch-pan-x [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]"
+                onScroll={() => {
+                  const el = lightboxScrollRef.current;
+                  if (!el || el.clientWidth <= 0) return;
+                  const index = Math.round(el.scrollLeft / el.clientWidth);
+                  if (index >= 0 && index < screenshots.length && index !== lightboxIndex) {
+                    setLightboxIndex(index);
+                  }
+                }}
+              >
+                {screenshots.map((shot, i) => (
+                  <div
+                    key={i}
+                    className="flex w-full shrink-0 snap-center snap-always items-center justify-center px-1"
+                  >
+                    <img
+                      src={shot.src}
+                      alt={shot.alt}
+                      className="max-h-[min(78vh,640px)] w-auto max-w-full rounded-2xl border border-white/10 shadow-2xl"
+                      draggable={false}
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-center text-[12px] text-white/45 tabular-nums">
+                {lightboxIndex + 1} / {screenshots.length}
+              </p>
+            </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
     </div>
   );
 }
