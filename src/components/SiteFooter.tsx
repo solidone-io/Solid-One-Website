@@ -44,9 +44,9 @@ const FOOTER_COLUMNS = [
 const SOCIAL_LINKS = [
   { icon: FaXTwitter, label: "X", href: "https://x.com/solidone_co" },
   { icon: FaLinkedin, label: "LinkedIn", href: "https://www.linkedin.com/company/solid-one-io/" },
-  { icon: FaTelegram, label: "Telegram", href: "https://t.me/+3GVDy2-FT0MyNDM1" },
+  { icon: FaTelegram, label: "Telegram", href: "https://t.me/+U3mdhWkbNcFmYTI8" },
   { icon: FaGithub, label: "GitHub", href: "https://github.com/Solid-One" },
-  { icon: FaYoutube, label: "YouTube", href: "#" },
+  { icon: FaYoutube, label: "YouTube", href: "https://www.youtube.com/channel/UCO0sWggaUEz3aejQKl-dODA" },
 ];
 
 export function SiteFooter() {
