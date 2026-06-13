@@ -10,6 +10,8 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/uploads/(.*)", "destination": "/api" },
+    { "source": "/whitepaper", "destination": "/whitepaper.pdf" },
+    { "source": "/whitepaper/", "destination": "/whitepaper.pdf" },
     { "source": "/((?!api/)(?!.*\\.).*)", "destination": "/index.html" }
   ]
 }

@@ -4,6 +4,30 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { storeNotifyDevPlugin } from "./vite-plugin-store-notify";
 
+function whitepaperPdfPlugin() {
+  return {
+    name: "whitepaper-pdf",
+    configureServer(server: { middlewares: { use: (fn: (req: { url?: string }, res: unknown, next: () => void) => void) => void } }) {
+      server.middlewares.use((req, _res, next) => {
+        const path = req.url?.split("?")[0];
+        if (path === "/whitepaper" || path === "/whitepaper/") {
+          req.url = `/whitepaper.pdf${req.url?.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""}`;
+        }
+        next();
+      });
+    },
+    configurePreviewServer(server: { middlewares: { use: (fn: (req: { url?: string }, res: unknown, next: () => void) => void) => void } }) {
+      server.middlewares.use((req, _res, next) => {
+        const path = req.url?.split("?")[0];
+        if (path === "/whitepaper" || path === "/whitepaper/") {
+          req.url = `/whitepaper.pdf${req.url?.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""}`;
+        }
+        next();
+      });
+    },
+  };
+}
+
 const rawPort = process.env.PORT ?? "5173";
 const port = Number(rawPort);
 
@@ -15,7 +39,7 @@ const basePath = process.env.BASE_PATH ?? "/";
 
 export default defineConfig({
   base: basePath,
-  plugins: [react(), tailwindcss(), storeNotifyDevPlugin()],
+  plugins: [react(), tailwindcss(), storeNotifyDevPlugin(), whitepaperPdfPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
