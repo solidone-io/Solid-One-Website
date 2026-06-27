@@ -4,6 +4,7 @@ import { signDownloadSession, verifyDownloadSession, type DownloadSession } from
 import {
   addReview,
   clearAdminReviewReply,
+  deleteReviewByUser,
   flagReview,
   getDownloadStats,
   getReviewByUser,
@@ -226,6 +227,30 @@ export async function handleDownloadMyReviewGet(
     status: 200,
     json: { ok: true, review: review ? serializeReview(review) : null },
   };
+}
+
+export async function handleDownloadMyReviewDelete(
+  session: DownloadSession | null,
+): Promise<{ status: number; json: Record<string, unknown> }> {
+  if (!session) return { status: 401, json: { error: "Sign in required." } };
+  try {
+    const result = await deleteReviewByUser(session.sub);
+    if (!result.ok) {
+      return { status: 404, json: { error: result.error } };
+    }
+    return { status: 200, json: { ok: true, stats: result.stats } };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not delete review.";
+    console.error("deleteReviewByUser failed:", err);
+    return {
+      status: 503,
+      json: {
+        error: message.includes("Blob") || message.includes("BLOB")
+          ? "Server storage error. Try again in a moment."
+          : message,
+      },
+    };
+  }
 }
 
 export async function handleDownloadReviewsGet(

@@ -35,6 +35,7 @@ import {
 import {
   fetchDownloadReviews,
   fetchDownloadStats,
+  deleteMyDownloadReview,
   fetchMyDownloadReview,
   flagDownloadReview,
   postDownloadReview,
@@ -499,12 +500,16 @@ function UserAvatar({ name, picture, className = "h-9 w-9" }: { name: string; pi
 
 function ReviewCard({
   review,
+  isOwnReview = false,
   onHelpful,
   onFlag,
+  onDelete,
 }: {
   review: DownloadReview;
+  isOwnReview?: boolean;
   onHelpful: (id: number, helpful: boolean) => void;
   onFlag: (id: number, reason: "spam" | "inappropriate") => void;
+  onDelete?: () => void;
 }) {
   const dateTime = new Date(review.createdAt).toLocaleString(undefined, {
     year: "numeric",
@@ -530,18 +535,29 @@ function ReviewCard({
           align="end"
           className="min-w-[180px] bg-[#1a1a1a] border-white/10 text-white"
         >
-          <DropdownMenuItem
-            className="text-[13px] focus:bg-white/10 focus:text-white cursor-pointer"
-            onClick={() => onFlag(review.id, "spam")}
-          >
-            Flag as spam
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-[13px] focus:bg-white/10 focus:text-white cursor-pointer"
-            onClick={() => onFlag(review.id, "inappropriate")}
-          >
-            Flag as inappropriate
-          </DropdownMenuItem>
+          {isOwnReview ? (
+            <DropdownMenuItem
+              className="text-[13px] text-red-300 focus:bg-red-500/10 focus:text-red-200 cursor-pointer"
+              onClick={onDelete}
+            >
+              Delete my review
+            </DropdownMenuItem>
+          ) : (
+            <>
+              <DropdownMenuItem
+                className="text-[13px] focus:bg-white/10 focus:text-white cursor-pointer"
+                onClick={() => onFlag(review.id, "spam")}
+              >
+                Flag as spam
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-[13px] focus:bg-white/10 focus:text-white cursor-pointer"
+                onClick={() => onFlag(review.id, "inappropriate")}
+              >
+                Flag as inappropriate
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -687,6 +703,22 @@ export function DownloadPageContent() {
       });
     } finally {
       setPosting(false);
+    }
+  };
+
+  const handleDeleteMyReview = async () => {
+    try {
+      const newStats = await deleteMyDownloadReview();
+      setStats(newStats);
+      setMyReview(null);
+      await refresh();
+      toast({ title: "Review deleted", description: "You can post a new review anytime." });
+    } catch (err) {
+      toast({
+        title: "Could not delete review",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -845,6 +877,8 @@ export function DownloadPageContent() {
             <ReviewCard
               key={r.id}
               review={r}
+              isOwnReview={myReview?.id === r.id}
+              onDelete={() => void handleDeleteMyReview()}
               onHelpful={async (id, helpful) => {
                 try {
                   await voteReviewHelpful(id, helpful);
@@ -996,6 +1030,11 @@ export function DownloadPageContent() {
               <ReviewCard
                 key={r.id}
                 review={r}
+                isOwnReview={myReview?.id === r.id}
+                onDelete={async () => {
+                  await handleDeleteMyReview();
+                  await loadModalReviews();
+                }}
                 onHelpful={async (id, helpful) => {
                   await voteReviewHelpful(id, helpful);
                   await loadModalReviews();

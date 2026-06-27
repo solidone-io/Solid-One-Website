@@ -4,6 +4,7 @@ import {
   handleDownloadGoogleAuth,
   handleDownloadInstall,
   handleDownloadApkGet,
+  handleDownloadMyReviewDelete,
   handleDownloadMyReviewGet,
   handleDownloadReleaseGet,
   handleDownloadReviewFlag,
@@ -27,6 +28,14 @@ export function registerDownloadRoutes(app: express.Express) {
     "/api/download/my-review",
     asyncRoute(async (req, res) => {
       const { status, json } = await handleDownloadMyReviewGet(sessionFromAuthHeader(req.headers.authorization));
+      res.status(status).json(json);
+    }),
+  );
+
+  app.delete(
+    "/api/download/my-review",
+    asyncRoute(async (req, res) => {
+      const { status, json } = await handleDownloadMyReviewDelete(sessionFromAuthHeader(req.headers.authorization));
       res.status(status).json(json);
     }),
   );

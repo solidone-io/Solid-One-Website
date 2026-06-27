@@ -3,6 +3,17 @@ import { MessageSquare, RefreshCw, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   deleteAdminReviewReply,
   fetchAdminDownloadReviews,
   postAdminReviewReply,
@@ -137,15 +148,38 @@ function ReviewAdminCard({
               >
                 Edit
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-red-300/80 hover:text-red-300"
-                onClick={() => void removeReply()}
-                disabled={saving}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-red-300/80 hover:text-red-300"
+                    disabled={saving}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Delete reply
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-[#111] border-white/10 text-white">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete your reply?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-white/55">
+                      This removes your response from the public download page. The user&apos;s review stays visible.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="border-white/15 bg-transparent text-white/70 hover:bg-white/5">
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-red-600 text-white hover:bg-red-500"
+                      onClick={() => void removeReply()}
+                    >
+                      Delete reply
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
           <p className="text-[14px] text-white/80 leading-relaxed whitespace-pre-wrap">{review.adminReply.text}</p>
@@ -228,7 +262,10 @@ export function AdminRatings({ token, onStats }: AdminRatingsProps) {
               <span className="text-[11px] text-white/50">{unanswered} awaiting reply</span>
             ) : null}
           </div>
-          <p className="text-[12px] text-white/40 mt-1">Reply to reviews — your response appears on the public download page.</p>
+          <p className="text-[12px] text-white/40 mt-1">
+            Reply to reviews — your response appears on the public download page. You can delete your reply only, not
+            user reviews.
+          </p>
         </div>
         <Button
           variant="outline"

@@ -119,6 +119,14 @@ export async function recordDownloadInstall(
   throw lastError ?? new Error("Could not record install.");
 }
 
+export async function deleteMyDownloadReview(): Promise<DownloadStats> {
+  const data = await api<{ stats: DownloadStats }>("/api/download/my-review", {
+    method: "DELETE",
+    auth: true,
+  });
+  return data.stats;
+}
+
 export async function fetchMyDownloadReview(): Promise<DownloadReview | null> {
   const data = await api<{ review: DownloadReview | null }>("/api/download/my-review", { auth: true });
   return data.review;

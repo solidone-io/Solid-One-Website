@@ -934,6 +934,14 @@ async function clearAdminReviewReply(reviewId) {
   await writeStore(store);
   return { ok: true, review };
 }
+async function deleteReviewByUser(googleSub) {
+  const store = await readStore();
+  const idx = store.reviews.findIndex((r) => r.googleSub === googleSub && !r.flagged);
+  if (idx < 0) return { ok: false, error: "Review not found." };
+  store.reviews.splice(idx, 1);
+  await writeStore(store);
+  return { ok: true, stats: computeStats(store.reviews, store.installs.length) };
+}
 async function setReviewHelpful(reviewId, googleSub, helpful) {
   const store = await readStore();
   const review = store.reviews.find((r) => r.id === reviewId && !r.flagged);
@@ -1190,6 +1198,25 @@ async function handleDownloadMyReviewGet(session) {
     json: { ok: true, review: review ? serializeReview(review) : null }
   };
 }
+async function handleDownloadMyReviewDelete(session) {
+  if (!session) return { status: 401, json: { error: "Sign in required." } };
+  try {
+    const result = await deleteReviewByUser(session.sub);
+    if (!result.ok) {
+      return { status: 404, json: { error: result.error } };
+    }
+    return { status: 200, json: { ok: true, stats: result.stats } };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not delete review.";
+    console.error("deleteReviewByUser failed:", err);
+    return {
+      status: 503,
+      json: {
+        error: message.includes("Blob") || message.includes("BLOB") ? "Server storage error. Try again in a moment." : message
+      }
+    };
+  }
+}
 async function handleDownloadReviewsGet(query) {
   const limit = Math.min(50, Math.max(1, Number(query.limit) || 5));
   const offset = Math.max(0, Number(query.offset) || 0);
@@ -1314,6 +1341,13 @@ function registerDownloadRoutes(app2) {
     "/api/download/my-review",
     asyncRoute(async (req, res) => {
       const { status, json } = await handleDownloadMyReviewGet(sessionFromAuthHeader(req.headers.authorization));
+      res.status(status).json(json);
+    })
+  );
+  app2.delete(
+    "/api/download/my-review",
+    asyncRoute(async (req, res) => {
+      const { status, json } = await handleDownloadMyReviewDelete(sessionFromAuthHeader(req.headers.authorization));
       res.status(status).json(json);
     })
   );

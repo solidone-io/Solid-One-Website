@@ -313,6 +313,17 @@ export async function clearAdminReviewReply(
   return { ok: true, review };
 }
 
+export async function deleteReviewByUser(
+  googleSub: string,
+): Promise<{ ok: true; stats: DownloadStats } | { ok: false; error: string }> {
+  const store = await readStore();
+  const idx = store.reviews.findIndex((r) => r.googleSub === googleSub && !r.flagged);
+  if (idx < 0) return { ok: false, error: "Review not found." };
+  store.reviews.splice(idx, 1);
+  await writeStore(store);
+  return { ok: true, stats: computeStats(store.reviews, store.installs.length) };
+}
+
 export async function setReviewHelpful(
   reviewId: number,
   googleSub: string,
