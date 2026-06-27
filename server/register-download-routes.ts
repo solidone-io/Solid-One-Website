@@ -3,7 +3,9 @@ import { asyncRoute } from "./async-route.js";
 import {
   handleDownloadGoogleAuth,
   handleDownloadInstall,
+  handleDownloadApkGet,
   handleDownloadMyReviewGet,
+  handleDownloadReleaseGet,
   handleDownloadReviewFlag,
   handleDownloadReviewHelpful,
   handleDownloadReviewPost,
@@ -46,10 +48,28 @@ export function registerDownloadRoutes(app: express.Express) {
     }),
   );
 
+  app.get(
+    "/api/download/release",
+    asyncRoute(async (_req, res) => {
+      const { status, json } = await handleDownloadReleaseGet();
+      res.status(status).json(json);
+    }),
+  );
+
+  app.get(
+    "/api/download/apk",
+    asyncRoute(async (req, res) => {
+      handleDownloadApkGet(sessionFromAuthHeader(req.headers.authorization), res);
+    }),
+  );
+
   app.post(
     "/api/download/install",
     asyncRoute(async (req, res) => {
-      const { status, json } = await handleDownloadInstall(sessionFromAuthHeader(req.headers.authorization));
+      const { status, json } = await handleDownloadInstall(
+        sessionFromAuthHeader(req.headers.authorization),
+        req.body,
+      );
       res.status(status).json(json);
     }),
   );

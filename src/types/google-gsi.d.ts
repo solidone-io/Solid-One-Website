@@ -7,6 +7,7 @@ interface GoogleAccountsId {
     client_id: string;
     callback: (response: GoogleCredentialResponse) => void;
     auto_select?: boolean;
+    use_fedcm_for_prompt?: boolean;
   }) => void;
   renderButton: (
     parent: HTMLElement,

@@ -40,6 +40,8 @@ Solid One is one app for wallet, payments, travel, recharge, credit, and daily s
 Learn more on our website at solidone.io. For product questions, partnerships, or operations support, contact us at operations@solidone.io.`,
   categories: ["Finance", "Cryptocurrency", "DeFi"],
   playStoreUrl: "/play-store",
+  androidPackage: "io.solidone.app",
+  apkFileName: "solid-one.apk",
   dataSafety: `Solid One is designed so you understand what happens with your information. This summary describes how the app and this download page handle data. Details may vary by app version, feature availability, and country.
 
 What we protect

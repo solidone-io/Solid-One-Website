@@ -1,4 +1,4 @@
-const API_BASE = "";
+import { apiUrl } from "@/lib/api-base";
 
 export type SupportRequestRow = {
   id: number;
@@ -20,7 +20,7 @@ export type SupportFormInput = {
 export async function submitSupportRequest(
   input: SupportFormInput,
 ): Promise<{ ok: true; message: string }> {
-  const res = await fetch(`${API_BASE}/api/support`, {
+  const res = await fetch(apiUrl("/api/support"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -40,7 +40,7 @@ export async function submitSupportRequest(
 }
 
 export async function fetchSupportRequests(token: string): Promise<SupportRequestRow[]> {
-  const res = await fetch(`${API_BASE}/api/admin/support`, {
+  const res = await fetch(apiUrl("/api/admin/support"), {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json().catch(() => ({}));
@@ -54,7 +54,7 @@ export async function toggleSupportRequestStar(
   token: string,
   id: number,
 ): Promise<SupportRequestRow> {
-  const res = await fetch(`${API_BASE}/api/admin/support/${id}/star`, {
+  const res = await fetch(apiUrl(`/api/admin/support/${id}/star`), {
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -66,7 +66,7 @@ export async function toggleSupportRequestStar(
 }
 
 export async function deleteSupportRequest(token: string, id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/admin/support/${id}`, {
+  const res = await fetch(apiUrl(`/api/admin/support/${id}`), {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });

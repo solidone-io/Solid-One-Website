@@ -25,6 +25,12 @@ import { registerDownloadRoutes } from "./register-download-routes.js";
 import { asyncRoute } from "./async-route.js";
 import { useBlobStorage } from "./persistent-json.js";
 import { isVercelRuntime } from "./runtime.js";
+import {
+  handleAdminInstallsList,
+  handleAdminReviewReply,
+  handleAdminReviewReplyDelete,
+  handleAdminReviewsList,
+} from "./download-handler.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -49,7 +55,8 @@ export function createApp() {
   }
 
   const app = express();
-  app.use(cors({ origin: true }));
+
+  app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: "2mb" }));
 
   app.get("/api/health", (_req, res) => {
@@ -158,6 +165,42 @@ export function createApp() {
 
   registerBlogRoutes(app, { requireAdmin, uploadsDir });
   registerDownloadRoutes(app);
+
+  app.get(
+    "/api/admin/download/installs",
+    requireAdmin,
+    asyncRoute(async (_req, res) => {
+      const { status, json } = await handleAdminInstallsList();
+      res.status(status).json(json);
+    }),
+  );
+
+  app.get(
+    "/api/admin/download/reviews",
+    requireAdmin,
+    asyncRoute(async (_req, res) => {
+      const { status, json } = await handleAdminReviewsList();
+      res.status(status).json(json);
+    }),
+  );
+
+  app.patch(
+    "/api/admin/download/reviews/:id/reply",
+    requireAdmin,
+    asyncRoute(async (req, res) => {
+      const { status, json } = await handleAdminReviewReply(Number(req.params.id), req.body);
+      res.status(status).json(json);
+    }),
+  );
+
+  app.delete(
+    "/api/admin/download/reviews/:id/reply",
+    requireAdmin,
+    asyncRoute(async (req, res) => {
+      const { status, json } = await handleAdminReviewReplyDelete(Number(req.params.id));
+      res.status(status).json(json);
+    }),
+  );
 
   return app;
 }

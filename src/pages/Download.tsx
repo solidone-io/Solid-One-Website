@@ -1,19 +1,8 @@
-import { useEffect, useState } from "react";
 import { HomeSiteHeader } from "@/components/HomeSiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { GoogleSignInGate } from "@/components/download/GoogleSignInGate";
 import { DownloadPageContent } from "@/components/download/DownloadPageContent";
-import { getDownloadAuth } from "@/lib/download-auth";
 
 export default function Download() {
-  const [authed, setAuthed] = useState(() => Boolean(getDownloadAuth()));
-
-  useEffect(() => {
-    const sync = () => setAuthed(Boolean(getDownloadAuth()));
-    window.addEventListener("solid-one-download-auth", sync);
-    return () => window.removeEventListener("solid-one-download-auth", sync);
-  }, []);
-
   return (
     <div className="bg-[#050505] text-white min-h-screen selection:bg-white selection:text-black max-md:overflow-x-hidden">
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
@@ -22,18 +11,12 @@ export default function Download() {
 
       <HomeSiteHeader />
 
-      {!authed && <GoogleSignInGate onSignedIn={() => setAuthed(true)} />}
-
-      {authed && (
-        <>
-          <main className="relative z-10 pt-28 md:pt-32">
-            <DownloadPageContent />
-          </main>
-          <div className="relative z-10 border-t border-white/6 pt-6 md:pt-8 mt-8">
-            <SiteFooter />
-          </div>
-        </>
-      )}
+      <main className="relative z-10 pt-28 md:pt-32">
+        <DownloadPageContent />
+      </main>
+      <div className="relative z-10 border-t border-white/6 pt-6 md:pt-8 mt-8">
+        <SiteFooter />
+      </div>
     </div>
   );
 }

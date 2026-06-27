@@ -1,4 +1,5 @@
 import { getDownloadAuthToken } from "@/lib/download-auth";
+import { apiUrl } from "@/lib/api-base";
 
 export type DownloadStats = {
   downloadCount: number;
@@ -16,6 +17,7 @@ export type DownloadReview = {
   createdAt: string;
   helpfulYes: number;
   helpfulNo: number;
+  adminReply: { text: string; repliedAt: string } | null;
 };
 
 export type DownloadUser = {
@@ -23,6 +25,15 @@ export type DownloadUser = {
   name: string;
   picture: string;
   email: string;
+};
+
+export type ApkRelease = {
+  packageName: string;
+  versionCode: number;
+  versionName: string;
+  fileName: string;
+  size: number;
+  downloadPath: string;
 };
 
 async function api<T>(
@@ -38,7 +49,7 @@ async function api<T>(
     if (!token) throw new Error("Sign in required.");
     headers.Authorization = `Bearer ${token}`;
   }
-  const res = await fetch(path, { ...options, headers });
+  const res = await fetch(apiUrl(path), { ...options, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(typeof data.error === "string" ? data.error : "Request failed.");
@@ -59,13 +70,22 @@ export async function googleAuthDownload(credential: string): Promise<{ token: s
   return { token: data.token, user: data.user };
 }
 
-export async function recordDownloadInstall(): Promise<{
+export async function fetchDownloadRelease(): Promise<ApkRelease> {
+  const data = await api<{ release: ApkRelease }>("/api/download/release");
+  return data.release;
+}
+
+export async function recordDownloadInstall(version?: {
+  versionCode?: number;
+  versionName?: string;
+}): Promise<{
   alreadyInstalled: boolean;
   stats: DownloadStats;
 }> {
   const data = await api<{ alreadyInstalled: boolean; stats: DownloadStats }>("/api/download/install", {
     method: "POST",
     auth: true,
+    body: JSON.stringify(version ?? {}),
   });
   return { alreadyInstalled: data.alreadyInstalled, stats: data.stats };
 }

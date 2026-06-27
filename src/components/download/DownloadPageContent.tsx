@@ -5,7 +5,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Download,
   MoreVertical,
   Search,
   Star,
@@ -39,12 +38,13 @@ import {
   fetchMyDownloadReview,
   flagDownloadReview,
   postDownloadReview,
-  recordDownloadInstall,
   voteReviewHelpful,
   type DownloadReview,
   type DownloadStats,
 } from "@/lib/download-api";
-import { getDownloadAuth, clearDownloadAuth } from "@/lib/download-auth";
+import { getDownloadAuth } from "@/lib/download-auth";
+import { InstallActionBar } from "@/components/download/InstallActionBar";
+import { GoogleSignInButton } from "@/components/download/GoogleSignInButton";
 import { useToast } from "@/hooks/use-toast";
 
 function formatCount(n: number): string {
@@ -555,6 +555,14 @@ function ReviewCard({
           {review.text ? (
             <p className="mt-2 text-[14px] text-white/65 leading-relaxed">{review.text}</p>
           ) : null}
+          {review.adminReply ? (
+            <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-3">
+              <p className="text-[11px] font-mono uppercase tracking-wider text-emerald-300/90 mb-1.5">
+                Response from Solid One
+              </p>
+              <p className="text-[13px] text-white/75 leading-relaxed whitespace-pre-wrap">{review.adminReply.text}</p>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -597,17 +605,17 @@ export function DownloadPageContent() {
   const [ratingText, setRatingText] = useState("");
   const [ratingAgreed, setRatingAgreed] = useState(false);
   const [posting, setPosting] = useState(false);
-  const [installOpen, setInstallOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "positive" | "negative" | "neutral">("all");
   const [search, setSearch] = useState("");
   const [modalReviews, setModalReviews] = useState<DownloadReview[]>([]);
   const [modalTotal, setModalTotal] = useState(0);
 
   const refresh = useCallback(async () => {
+    const authed = Boolean(getDownloadAuth());
     const [s, r, mine] = await Promise.all([
       fetchDownloadStats(),
       fetchDownloadReviews({ limit: 5, offset: 0 }),
-      fetchMyDownloadReview().catch(() => null),
+      authed ? fetchMyDownloadReview().catch(() => null) : Promise.resolve(null),
     ]);
     setStats(s);
     setReviews(r.reviews);
@@ -618,6 +626,13 @@ export function DownloadPageContent() {
   const hasReviewed = Boolean(myReview);
 
   const openRatingDialog = (stars: number) => {
+    if (!getDownloadAuth()) {
+      toast({
+        title: "Sign in to rate",
+        description: "Use Sign in to install above, then leave a review.",
+      });
+      return;
+    }
     if (hasReviewed) return;
     setDraftStars(stars);
     setRatingText("");
@@ -653,19 +668,6 @@ export function DownloadPageContent() {
   useEffect(() => {
     if (allReviewsOpen) loadModalReviews().catch(() => {});
   }, [allReviewsOpen, loadModalReviews]);
-
-  const handleInstall = () => {
-    setInstallOpen(true);
-    recordDownloadInstall()
-      .then((result) => setStats(result.stats))
-      .catch(() => {
-        toast({
-          title: "Could not record install",
-          description: "Try again in a moment.",
-          variant: "destructive",
-        });
-      });
-  };
 
   const handlePostReview = async () => {
     if (draftStars < 1) return;
@@ -737,22 +739,11 @@ export function DownloadPageContent() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col sm:flex-row gap-3">
-          <Button
-            className="flex-1 h-12 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-[15px]"
-            onClick={handleInstall}
-          >
-            <Download className="h-5 w-5 mr-2" />
-            Install
-          </Button>
-        </div>
+        <InstallActionBar onStatsChange={setStats} />
 
-        {auth && (
-          <p className="mt-8 text-[12px] text-white/35 text-center">
-            Signed in as {auth.user.name}
-            <button type="button" className="ml-2 underline hover:text-white/60" onClick={() => clearDownloadAuth()}>
-              Sign out
-            </button>
+        {!getDownloadAuth() && (
+          <p className="mt-4 text-[12px] text-white/35 text-center">
+            Sign in with Google to download. Reviews also require sign-in.
           </p>
         )}
       </section>
@@ -890,25 +881,6 @@ export function DownloadPageContent() {
         )}
       </section>
 
-      {/* Install popup */}
-      <Dialog open={installOpen} onOpenChange={setInstallOpen}>
-        <DialogContent className="max-w-sm bg-[#111] border-white/10 text-white text-center">
-          <div className="flex flex-col items-center py-2">
-            <img
-              src={DOWNLOAD_APP.icon}
-              alt=""
-              className="h-[58px] w-[58px] rounded-2xl border border-white/10 mb-4"
-              draggable={false}
-            />
-            <DialogHeader className="space-y-2 sm:text-center">
-              <DialogTitle className="text-lg">Coming soon</DialogTitle>
-            </DialogHeader>
-            <p className="text-[14px] text-white/55 mt-2 leading-relaxed">
-              Development is ongoing. Coming soon.
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Rating dialog */}
       <Dialog
@@ -932,10 +904,15 @@ export function DownloadPageContent() {
             </div>
           </DialogHeader>
 
-          {auth && (
+          {auth ? (
             <div className="flex items-center gap-3 py-2 border-y border-white/8">
               <UserAvatar name={auth.user.name} picture={auth.user.picture} />
               <p className="text-[14px] font-medium">{auth.user.name}</p>
+            </div>
+          ) : (
+            <div className="py-3 border-y border-white/8">
+              <p className="text-[13px] text-white/50 mb-3 text-center">Sign in to post a review</p>
+              <GoogleSignInButton />
             </div>
           )}
 

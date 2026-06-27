@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { Link } from "wouter";
 import { motion, useScroll, useTransform, useInView, AnimatePresence } from "framer-motion";
-import { Shield, Zap, Globe, Wallet, CreditCard, QrCode, Bot, MessageSquare, Sparkles, Users, Plane, BarChart3, Code2, Fingerprint, Unplug, KeyRound, ShieldCheck, ScanEye, LockKeyhole, UserCheck } from "lucide-react";
+import { Shield, Zap, Globe, Wallet, CreditCard, QrCode, Bot, MessageSquare, Sparkles, Users, Plane, BarChart3, Code2, Fingerprint, Unplug, KeyRound, ShieldCheck, ScanEye, LockKeyhole, UserCheck, Download } from "lucide-react";
 import { MobileMenuButton, MobileNavMenu } from "@/components/MobileNavMenu";
 import { Button } from "@/components/ui/button";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -28,6 +28,9 @@ import marginfiPartnerLogo from "@assets/partners/marginfi.png";
 import squadsPartnerLogo from "@assets/partners/squads.png";
 import fiatLogo from "@assets/partners/fiat.svg";
 import upiLogo from "@assets/partners/upi.svg";
+
+const androidQrImg = `${import.meta.env.BASE_URL}solid-one-android-qr.png`;
+const futureBgImg = `${import.meta.env.BASE_URL}solid-future-bg.png`;
 
 /* ─────────────────────────── animation presets ─────────────────────────── */
 const FADE_UP = {
@@ -460,17 +463,22 @@ export default function Home() {
               </motion.div>
 
               {/* CTAs */}
-              <motion.div variants={FADE_UP} className="flex flex-row flex-nowrap items-center justify-center gap-3 mt-6 w-full max-w-full">
+              <motion.div variants={FADE_UP} className="flex flex-row flex-nowrap items-end justify-center gap-3 mt-6 w-full max-w-full">
                 {/* App Store */}
-                <Link href="/app-store" className="flex items-center gap-2.5 px-5 py-2 rounded-lg bg-white text-black hover:bg-white/90 transition-colors min-w-[152px] shrink-0">
-                  <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" className="flex-shrink-0">
-                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                  </svg>
-                  <div className="text-left">
-                    <div className="text-[8px] font-mono uppercase tracking-[0.15em] opacity-70">Download on the</div>
-                    <div className="text-[14px] font-semibold leading-tight -mt-0.5">App Store</div>
-                  </div>
-                </Link>
+                <div className="flex flex-col items-center gap-1.5 shrink-0">
+                  <span className="text-[9px] font-mono uppercase tracking-[0.18em] text-white px-2 py-0.5 border border-white/20 bg-black rounded select-none">
+                    Coming Soon
+                  </span>
+                  <Link href="/app-store" className="flex items-center gap-2.5 px-5 py-2 rounded-lg bg-white text-black hover:bg-white/90 transition-colors min-w-[152px]">
+                    <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" className="flex-shrink-0">
+                      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                    </svg>
+                    <div className="text-left">
+                      <div className="text-[8px] font-mono uppercase tracking-[0.15em] opacity-70">Download on the</div>
+                      <div className="text-[14px] font-semibold leading-tight -mt-0.5">App Store</div>
+                    </div>
+                  </Link>
+                </div>
 
                 {/* Google Play */}
                 <Link href="/play-store" className="flex items-center gap-2.5 px-5 py-2 rounded-lg border border-white/20 text-white hover:bg-white/5 transition-colors min-w-[152px] shrink-0">
@@ -851,8 +859,16 @@ export default function Home() {
         </section>
 
         {/* ══ CTA BANNER ════════════════════════════════════════════════════ */}
-        <section className="py-40">
-          <div className="max-w-7xl mx-auto px-6 md:px-10 text-center">
+        <section className="relative py-40 overflow-hidden">
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{ backgroundImage: `url(${futureBgImg})` }}
+            aria-hidden
+          />
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-36 md:h-48 bg-gradient-to-b from-[#050505] via-[#050505]/80 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-36 md:h-48 bg-gradient-to-t from-[#050505] via-[#050505]/80 to-transparent" />
+
+          <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10 text-center">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={STAGGER}>
               <motion.h2 variants={FADE_UP} className="font-display text-[clamp(2.25rem,6vw,5.25rem)] tracking-[0.04em] leading-[0.88] mb-8 flex flex-col items-center gap-3 md:gap-4">
                 <span>THE FUTURE</span>
@@ -867,16 +883,21 @@ export default function Home() {
                   SOLID.
                 </span>
               </motion.h2>
-              <motion.div variants={FADE_UP} className="flex flex-row flex-nowrap items-center justify-center gap-3 mt-6 w-full max-w-full">
-                <Link href="/app-store" className="flex items-center gap-2.5 px-5 py-2 rounded-lg bg-white text-black hover:bg-white/90 transition-colors min-w-[152px] shrink-0">
-                  <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" className="flex-shrink-0">
-                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                  </svg>
-                  <div className="text-left">
-                    <div className="text-[8px] font-mono uppercase tracking-[0.15em] opacity-70">Download on the</div>
-                    <div className="text-[14px] font-semibold leading-tight -mt-0.5">App Store</div>
-                  </div>
-                </Link>
+              <motion.div variants={FADE_UP} className="flex flex-row flex-nowrap items-end justify-center gap-3 mt-6 w-full max-w-full">
+                <div className="flex flex-col items-center gap-1.5 shrink-0">
+                  <span className="text-[9px] font-mono uppercase tracking-[0.18em] text-white px-2 py-0.5 border border-white/20 bg-black rounded select-none">
+                    Coming Soon
+                  </span>
+                  <Link href="/app-store" className="flex items-center gap-2.5 px-5 py-2 rounded-lg bg-white text-black hover:bg-white/90 transition-colors min-w-[152px]">
+                    <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" className="flex-shrink-0">
+                      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                    </svg>
+                    <div className="text-left">
+                      <div className="text-[8px] font-mono uppercase tracking-[0.15em] opacity-70">Download on the</div>
+                      <div className="text-[14px] font-semibold leading-tight -mt-0.5">App Store</div>
+                    </div>
+                  </Link>
+                </div>
                 <Link href="/play-store" className="flex items-center gap-2.5 px-5 py-2 rounded-lg border border-white/20 text-white hover:bg-white/5 transition-colors min-w-[152px] shrink-0">
                   <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/Google_Play_Arrow_logo.svg" alt="Google Play" width="19" height="19" className="flex-shrink-0" />
                   <div className="text-left">
@@ -884,6 +905,45 @@ export default function Home() {
                     <div className="text-[14px] font-semibold leading-tight -mt-0.5">Google Play</div>
                   </div>
                 </Link>
+              </motion.div>
+
+              <motion.div variants={FADE_UP} className="mt-14 w-full max-w-lg mx-auto">
+                <div className="relative rounded-2xl border border-white/12 bg-white/[0.03] backdrop-blur-sm p-4 md:p-5 overflow-hidden">
+                  <div className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl" />
+                  <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6">
+                    <div className="shrink-0">
+                      <div className="rounded-[14px] bg-white p-3 shadow-[0_16px_48px_rgba(0,0,0,0.45)] ring-1 ring-white/80">
+                        <img
+                          src={androidQrImg}
+                          alt="Scan to download Solid One for Android"
+                          width={140}
+                          height={140}
+                          className="block w-[140px] h-[140px] sm:w-[154px] sm:h-[154px] object-contain"
+                          draggable={false}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex-1 text-center sm:text-left min-w-0">
+                      <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-emerald-400/90 mb-1.5">
+                        Android APK
+                      </p>
+                      <h3 className="text-[17px] md:text-[18px] font-semibold text-white mb-1.5">
+                        Download for Android
+                      </h3>
+                      <p className="text-[13px] text-white/45 leading-relaxed mb-4 max-w-[240px] mx-auto sm:mx-0">
+                        Scan to install, or tap below to download.
+                      </p>
+                      <Link
+                        href="/download"
+                        className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 text-black hover:bg-emerald-400 text-[13px] font-semibold h-10 px-5 transition-colors"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download APK for Android
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             </motion.div>
           </div>

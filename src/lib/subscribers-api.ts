@@ -1,4 +1,4 @@
-const API_BASE = "";
+import { apiUrl } from "@/lib/api-base";
 
 export type SubscriberRow = {
   id: number;
@@ -7,7 +7,7 @@ export type SubscriberRow = {
 };
 
 export async function subscribeEmail(email: string): Promise<{ ok: true; message: string }> {
-  const res = await fetch(`${API_BASE}/api/subscribe`, {
+  const res = await fetch(apiUrl("/api/subscribe"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
@@ -20,11 +20,16 @@ export async function subscribeEmail(email: string): Promise<{ ok: true; message
 }
 
 export async function adminLogin(password: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/admin/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(apiUrl("/api/admin/login"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+  } catch {
+    throw new Error("Cannot reach API. Run pnpm dev (web + api) or pnpm start, then try again.");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(typeof data.error === "string" ? data.error : "Login failed.");
@@ -33,7 +38,7 @@ export async function adminLogin(password: string): Promise<string> {
 }
 
 export async function fetchSubscribers(token: string): Promise<SubscriberRow[]> {
-  const res = await fetch(`${API_BASE}/api/admin/subscribers`, {
+  const res = await fetch(apiUrl("/api/admin/subscribers"), {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json().catch(() => ({}));
@@ -44,7 +49,7 @@ export async function fetchSubscribers(token: string): Promise<SubscriberRow[]> 
 }
 
 export async function deleteSubscriber(token: string, id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/admin/subscribers/${id}`, {
+  const res = await fetch(apiUrl(`/api/admin/subscribers/${id}`), {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });

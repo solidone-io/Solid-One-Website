@@ -1,4 +1,4 @@
-const API_BASE = "";
+import { apiUrl, mediaUrl } from "@/lib/api-base";
 
 export type BlogPost = {
   id: number;
@@ -32,58 +32,62 @@ async function parseError(res: Response, fallback: string) {
   throw new Error(typeof data.error === "string" ? data.error : fallback);
 }
 
+function normalizePost(post: BlogPost): BlogPost {
+  return { ...post, coverImage: mediaUrl(post.coverImage) };
+}
+
 export async function fetchPublicPosts(): Promise<BlogPost[]> {
-  const res = await fetch(`${API_BASE}/api/blog`);
+  const res = await fetch(apiUrl("/api/blog"));
   if (!res.ok) await parseError(res, "Could not load posts.");
   const data = await res.json();
-  return (data.posts ?? []) as BlogPost[];
+  return ((data.posts ?? []) as BlogPost[]).map(normalizePost);
 }
 
 export async function fetchPublicPost(slug: string): Promise<BlogPost> {
-  const res = await fetch(`${API_BASE}/api/blog/${encodeURIComponent(slug)}`);
+  const res = await fetch(apiUrl(`/api/blog/${encodeURIComponent(slug)}`));
   if (!res.ok) await parseError(res, "Post not found.");
   const data = await res.json();
-  return data.post as BlogPost;
+  return normalizePost(data.post as BlogPost);
 }
 
 export async function fetchAdminPosts(token: string): Promise<BlogPost[]> {
-  const res = await fetch(`${API_BASE}/api/admin/blog`, { headers: authHeaders(token) });
+  const res = await fetch(apiUrl("/api/admin/blog"), { headers: authHeaders(token) });
   if (!res.ok) await parseError(res, "Could not load posts.");
   const data = await res.json();
-  return (data.posts ?? []) as BlogPost[];
+  return ((data.posts ?? []) as BlogPost[]).map(normalizePost);
 }
 
 export async function fetchAdminPost(token: string, id: number): Promise<BlogPost> {
-  const res = await fetch(`${API_BASE}/api/admin/blog/${id}`, { headers: authHeaders(token) });
+  const res = await fetch(apiUrl(`/api/admin/blog/${id}`), { headers: authHeaders(token) });
   if (!res.ok) await parseError(res, "Could not load post.");
   const data = await res.json();
-  return data.post as BlogPost;
+  return normalizePost(data.post as BlogPost);
 }
 
 export async function createPost(token: string, input: BlogPostInput): Promise<BlogPost> {
-  const res = await fetch(`${API_BASE}/api/admin/blog`, {
+  const res = await fetch(apiUrl("/api/admin/blog"), {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(input),
   });
   if (!res.ok) await parseError(res, "Could not create post.");
   const data = await res.json();
-  return data.post as BlogPost;
+  return normalizePost(data.post as BlogPost);
 }
 
 export async function updatePost(token: string, id: number, input: BlogPostInput): Promise<BlogPost> {
-  const res = await fetch(`${API_BASE}/api/admin/blog/${id}`, {
+  const res = await fetch(apiUrl(`/api/admin/blog/${id}`), {
     method: "PUT",
     headers: authHeaders(token),
     body: JSON.stringify(input),
   });
   if (!res.ok) await parseError(res, "Could not update post.");
   const data = await res.json();
-  return data.post as BlogPost;
+  return normalizePost(data.post as BlogPost);
 }
 
 export async function deletePost(token: string, id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/admin/blog/${id}`, {
+  const res = await fetch(apiUrl(`/api/admin/blog/${id}`), {
     method: "DELETE",
     headers: authHeaders(token),
   });
@@ -93,14 +97,14 @@ export async function deletePost(token: string, id: number): Promise<void> {
 export async function uploadBlogImage(token: string, file: File): Promise<string> {
   const form = new FormData();
   form.append("image", file);
-  const res = await fetch(`${API_BASE}/api/admin/blog/upload`, {
+  const res = await fetch(apiUrl("/api/admin/blog/upload"), {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
   if (!res.ok) await parseError(res, "Image upload failed.");
   const data = await res.json();
-  return data.url as string;
+  return mediaUrl(data.url as string) ?? (data.url as string);
 }
 
 export function slugifyTitle(title: string): string {

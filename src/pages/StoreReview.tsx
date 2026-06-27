@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { MarketingHeader } from "@/components/MarketingHeader";
+import { Download } from "lucide-react";
+import { HomeSiteHeader } from "@/components/HomeSiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { StoreNotifyForm } from "@/components/StoreNotifyForm";
 import type { StorePlatform } from "@/lib/store-notify-api";
@@ -27,8 +28,8 @@ const STORE: Record<
   google: {
     eyebrow: "Android",
     title: "GOOGLE PLAY",
-    badge: "Under Google review",
-    body: "The Solid One app is currently under review by Google. It will be visible on Google Play shortly.",
+    badge: "Coming Soon",
+    body: "Solid One is not on Google Play yet. Get notified when it goes live, or download the APK for Android below.",
     storeName: "Google Play",
   },
 };
@@ -51,15 +52,15 @@ function StoreReviewPage({ kind }: { kind: StoreKind }) {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[min(100%,900px)] h-[420px] bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.07)_0%,transparent_70%)]" />
       </div>
 
-      <MarketingHeader />
+      <HomeSiteHeader />
 
-      <main className="relative z-10 pt-28 md:pt-36 pb-8 flex flex-col min-h-[calc(100vh-120px)]">
-        <section className="flex-1 flex items-center justify-center px-6 md:px-10">
+      <main className="relative z-10 pt-28 md:pt-36 pb-8">
+        <section className="px-6 md:px-10 py-8 md:py-12">
           <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-lg text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="w-full max-w-lg mx-auto text-center"
           >
             <div className="flex justify-center mb-6">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.04]">
@@ -83,7 +84,13 @@ function StoreReviewPage({ kind }: { kind: StoreKind }) {
               {config.title}
             </h1>
 
-            <span className="inline-block rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-1.5 text-[12px] font-mono uppercase tracking-[0.12em] text-amber-200/90 mb-6">
+            <span
+              className={`inline-block rounded-full border px-4 py-1.5 text-[12px] font-mono uppercase tracking-[0.12em] mb-6 ${
+                kind === "google"
+                  ? "border-white/20 bg-black text-white"
+                  : "border-amber-400/30 bg-amber-400/10 text-amber-200/90"
+              }`}
+            >
               {config.badge}
             </span>
 
@@ -92,6 +99,29 @@ function StoreReviewPage({ kind }: { kind: StoreKind }) {
             <div className="mb-8">
               <StoreNotifyForm platform={platform} storeName={config.storeName} />
             </div>
+
+            {kind === "google" && (
+              <>
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-white/10" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-[#050505] px-3 text-[11px] font-mono uppercase tracking-[0.15em] text-white/35">
+                      or
+                    </span>
+                  </div>
+                </div>
+
+                <Link
+                  href="/download"
+                  className="inline-flex items-center justify-center gap-2 rounded-[9px] bg-emerald-500 text-black hover:bg-emerald-400 text-[14px] font-semibold h-11 px-6 transition-colors w-full max-w-lg mx-auto mb-8"
+                >
+                  <Download className="h-4 w-4" />
+                  Download APK for Android
+                </Link>
+              </>
+            )}
 
             <Link
               href="/"

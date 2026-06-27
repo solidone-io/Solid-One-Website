@@ -1,4 +1,4 @@
-const API_BASE = "";
+import { apiUrl, mediaUrl } from "@/lib/api-base";
 
 export type StorePlatform = "apple" | "google";
 
@@ -13,7 +13,7 @@ export async function submitStoreNotify(
   email: string,
   platform: StorePlatform,
 ): Promise<{ ok: true; message: string }> {
-  const res = await fetch(`${API_BASE}/api/store-notify`, {
+  const res = await fetch(apiUrl("/api/store-notify"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, platform }),
@@ -37,7 +37,7 @@ export async function submitStoreNotify(
 }
 
 export async function fetchStoreNotifySignups(token: string): Promise<StoreNotifyRow[]> {
-  const res = await fetch(`${API_BASE}/api/admin/store-notify`, {
+  const res = await fetch(apiUrl("/api/admin/store-notify"), {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json().catch(() => ({}));
@@ -48,7 +48,7 @@ export async function fetchStoreNotifySignups(token: string): Promise<StoreNotif
 }
 
 export async function deleteStoreNotifySignup(token: string, id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/admin/store-notify/${id}`, {
+  const res = await fetch(apiUrl(`/api/admin/store-notify/${id}`), {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });

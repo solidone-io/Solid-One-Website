@@ -4,8 +4,8 @@ import { MarketingHeader } from "@/components/MarketingHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
 const FADE_UP = {
-  hidden: { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] as const } },
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.4 } },
 };
 
 type ComingSoonProps = {
@@ -27,13 +27,13 @@ export function ComingSoon({ title, eyebrow = "Solid One" }: ComingSoonProps) {
         ]}
       />
 
-      <main className="relative z-10 pt-28 md:pt-36 pb-8 flex flex-col min-h-[calc(100vh-120px)]">
-        <section className="flex-1 flex items-center justify-center px-6 md:px-10">
+      <main className="relative z-10 pt-28 md:pt-36 pb-8">
+        <section className="px-6 md:px-10 py-8 md:py-12">
           <motion.div
             initial="hidden"
             animate="visible"
             variants={FADE_UP}
-            className="max-w-lg w-full text-center"
+            className="max-w-lg w-full mx-auto text-center"
           >
             <p className="text-[11px] font-mono uppercase tracking-[0.22em] text-white/40 mb-5">{eyebrow}</p>
             <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] tracking-[0.06em] leading-[1.05] mb-5">

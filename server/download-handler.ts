@@ -3,14 +3,21 @@ import { fetchGoogle, googleFetchSslHint } from "./google-fetch.js";
 import { signDownloadSession, verifyDownloadSession, type DownloadSession } from "./download-jwt.js";
 import {
   addReview,
+  clearAdminReviewReply,
   flagReview,
   getDownloadStats,
   getReviewByUser,
+  listAllReviewsAdmin,
+  listInstalls,
   listReviews,
   recordInstall,
+  serializeInstall,
   serializeReview,
+  serializeReviewAdmin,
+  setAdminReviewReply,
   setReviewHelpful,
 } from "./download-store.js";
+import { getApkReleaseInfo, streamApkFile } from "./apk-release.js";
 
 function jwtSecret(): string {
   return (
@@ -161,13 +168,40 @@ export async function handleDownloadStatsGet(): Promise<{ status: number; json: 
 
 export async function handleDownloadInstall(
   session: DownloadSession | null,
+  body?: unknown,
 ): Promise<{ status: number; json: Record<string, unknown> }> {
   if (!session) return { status: 401, json: { error: "Sign in required." } };
-  const result = await recordInstall(session.sub);
+  const parsed = z
+    .object({
+      versionCode: z.number().int().positive().optional(),
+      versionName: z.string().max(32).optional(),
+    })
+    .safeParse(body ?? {});
+  const version = parsed.success ? parsed.data : undefined;
+  const result = await recordInstall(session, version);
   return {
     status: 200,
     json: { ok: true, alreadyInstalled: result.alreadyInstalled, stats: result.stats },
   };
+}
+
+export async function handleDownloadReleaseGet(): Promise<{ status: number; json: Record<string, unknown> }> {
+  const release = await getApkReleaseInfo();
+  if (!release) {
+    return { status: 404, json: { error: "APK release not configured on server." } };
+  }
+  return { status: 200, json: { ok: true, release } };
+}
+
+export function handleDownloadApkGet(
+  session: DownloadSession | null,
+  res: import("express").Response,
+): void {
+  if (!session) {
+    res.status(401).json({ error: "Sign in required." });
+    return;
+  }
+  streamApkFile(res);
 }
 
 export async function handleDownloadMyReviewGet(
@@ -223,6 +257,7 @@ export async function handleDownloadReviewPost(
 
   const result = await addReview({
     googleSub: session.sub,
+    userEmail: session.email,
     userName: session.name,
     userPicture: session.picture,
     stars: parsed.data.stars,
@@ -266,4 +301,47 @@ export async function handleDownloadReviewFlag(
   await flagReview(reviewId, parsed.data.reason);
   const stats = await getDownloadStats();
   return { status: 200, json: { ok: true, stats } };
+}
+
+export async function handleAdminInstallsList(): Promise<{ status: number; json: Record<string, unknown> }> {
+  const installs = await listInstalls();
+  const stats = await getDownloadStats();
+  return {
+    status: 200,
+    json: { ok: true, installs: installs.map(serializeInstall), stats },
+  };
+}
+
+export async function handleAdminReviewsList(): Promise<{ status: number; json: Record<string, unknown> }> {
+  const reviews = await listAllReviewsAdmin();
+  const stats = await getDownloadStats();
+  return {
+    status: 200,
+    json: { ok: true, reviews: reviews.map(serializeReviewAdmin), stats },
+  };
+}
+
+export async function handleAdminReviewReply(
+  reviewId: number,
+  body: unknown,
+): Promise<{ status: number; json: Record<string, unknown> }> {
+  const parsed = z.object({ text: z.string().max(1000) }).safeParse(body);
+  if (!parsed.success) {
+    return { status: 400, json: { error: validationError(parsed.error) } };
+  }
+  const result = await setAdminReviewReply(reviewId, parsed.data.text);
+  if (!result.ok) {
+    return { status: 400, json: { error: result.error } };
+  }
+  return { status: 200, json: { ok: true, review: serializeReviewAdmin(result.review) } };
+}
+
+export async function handleAdminReviewReplyDelete(
+  reviewId: number,
+): Promise<{ status: number; json: Record<string, unknown> }> {
+  const result = await clearAdminReviewReply(reviewId);
+  if (!result.ok) {
+    return { status: 404, json: { error: result.error } };
+  }
+  return { status: 200, json: { ok: true, review: serializeReviewAdmin(result.review) } };
 }

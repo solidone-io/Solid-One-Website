@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   type CookieConsentChoice,
@@ -8,11 +8,18 @@ import {
 } from "@/lib/cookie-consent";
 
 export function CookieConsent() {
+  const [location] = useLocation();
   const [visible, setVisible] = useState(false);
 
+  const isAdmin = location === "/admin1855" || location.startsWith("/admin1855/");
+
   useEffect(() => {
+    if (isAdmin) {
+      setVisible(false);
+      return;
+    }
     setVisible(getCookieConsent() === null);
-  }, []);
+  }, [isAdmin]);
 
   const choose = (choice: CookieConsentChoice) => {
     setCookieConsent(choice);
