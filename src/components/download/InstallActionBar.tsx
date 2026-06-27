@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, ExternalLink, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { GoogleSignInButton } from "@/components/download/GoogleSignInButton";
 import { DOWNLOAD_APP } from "@/content/download-app";
 import {
@@ -25,7 +26,62 @@ import {
 import { clearDownloadAuth, getDownloadAuth } from "@/lib/download-auth";
 import { useToast } from "@/hooks/use-toast";
 
-type InstallPhase = "idle" | "starting";
+type InstallPhase = "idle" | "downloading";
+
+function DownloadInProgressPanel({
+  release,
+  isUpdate,
+  onDone,
+}: {
+  release: ApkRelease;
+  isUpdate: boolean;
+  onDone: () => void;
+}) {
+  const [pulse, setPulse] = useState(12);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setPulse((v) => (v >= 88 ? 18 : v + 7));
+    }, 450);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="mt-6 space-y-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
+      <div className="flex items-center gap-2 text-emerald-300">
+        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+        <span className="text-[14px] font-medium">
+          {isUpdate ? "Update downloading…" : "Download in progress…"}
+        </span>
+      </div>
+
+      <Progress value={pulse} className="h-2 bg-white/10 [&>div]:bg-emerald-400" />
+
+      <div className="space-y-1.5 text-[12px] text-white/50 leading-relaxed">
+        {isAndroidDevice() ? (
+          <>
+            <p>Chrome is downloading the APK (~{formatBytes(release.size)}). Progress appears in Chrome, not on this page.</p>
+            <p>
+              <span className="text-white/70">Where to look:</span> pull down the notification shade, or tap Chrome&apos;s
+              menu (⋮) → <span className="text-white/70">Downloads</span>.
+            </p>
+            <p>When the download finishes, tap the file and choose Install.</p>
+          </>
+        ) : (
+          <p>Your browser is downloading the APK. Check your downloads folder, then transfer it to your Android phone.</p>
+        )}
+      </div>
+
+      <Button
+        variant="outline"
+        className="w-full h-10 rounded-full border-white/15 text-white/80 hover:bg-white/5"
+        onClick={onDone}
+      >
+        Back to download page
+      </Button>
+    </div>
+  );
+}
 
 type InstallActionBarProps = {
   onStatsChange?: (stats: DownloadStats) => void;
@@ -38,6 +94,7 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
   const [installed, setInstalled] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [phase, setPhase] = useState<InstallPhase>("idle");
+  const [downloadIsUpdate, setDownloadIsUpdate] = useState(false);
 
   const syncAuth = useCallback(() => setAuthed(Boolean(getDownloadAuth())), []);
 
@@ -76,7 +133,8 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
       versionName: release.versionName,
     };
 
-    setPhase("starting");
+    setDownloadIsUpdate(isUpdate);
+    setPhase("downloading");
 
     // Record on server (keepalive survives Android navigation) + retry in background.
     recordDownloadInstallKeepalive(version);
@@ -94,11 +152,9 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
     toast({
       title: isUpdate ? "Update started" : "Download started",
       description: isAndroidDevice()
-        ? "Chrome will download the app. Tap Install when prompted."
+        ? "Check Chrome notifications or Downloads for progress."
         : "Open the downloaded APK on your Android device to install.",
     });
-
-    window.setTimeout(() => setPhase("idle"), 1500);
   };
 
   const handleUninstall = () => {
@@ -149,15 +205,13 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
     );
   }
 
-  if (phase === "starting") {
+  if (phase === "downloading" && release) {
     return (
-      <div className="mt-6 space-y-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
-        <div className="flex items-center gap-2 text-emerald-300">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-[14px] font-medium">Starting download…</span>
-        </div>
-        <p className="text-[12px] text-white/45">Chrome will handle the download and install prompt.</p>
-      </div>
+      <DownloadInProgressPanel
+        release={release}
+        isUpdate={downloadIsUpdate}
+        onDone={() => setPhase("idle")}
+      />
     );
   }
 
