@@ -22,7 +22,8 @@ function isVercelRuntime() {
 var __dirname = path.dirname(fileURLToPath(import.meta.url));
 var dataDir = path.resolve(__dirname, "..", "data");
 function useBlobStorage() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  if (process.env.BLOB_READ_WRITE_TOKEN) return true;
+  return isVercelRuntime() && Boolean(process.env.BLOB_STORE_ID);
 }
 function ensureLocalDataDir() {
   if (useBlobStorage() || isVercelRuntime()) return;
@@ -65,7 +66,7 @@ async function writeJsonFile(filename, data) {
   const body = JSON.stringify(data, null, 2);
   if (!useBlobStorage()) {
     if (isVercelRuntime()) {
-      throw new Error("BLOB_READ_WRITE_TOKEN is required on Vercel to save website data.");
+      throw new Error("Blob storage is required on Vercel to save website data.");
     }
     ensureLocalDataDir();
     writeFileSync(path.join(dataDir, filename), body, "utf8");
