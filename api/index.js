@@ -40,7 +40,7 @@ async function readJsonFile(filename, fallback) {
       return fallback;
     }
   }
-  const { head } = await import("@vercel/blob");
+  const { head, list } = await import("@vercel/blob");
   const blobPath = `solid-one/${filename}`;
   try {
     const meta = await head(blobPath);
@@ -48,7 +48,17 @@ async function readJsonFile(filename, fallback) {
     if (!httpRes.ok) return fallback;
     return await httpRes.json();
   } catch {
-    return fallback;
+    try {
+      const result = await list({ prefix: blobPath, limit: 20 });
+      const exact = result.blobs.find((b) => b.pathname === blobPath);
+      const blob = exact ?? result.blobs.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime())[0];
+      if (!blob) return fallback;
+      const httpRes = await fetch(blob.url);
+      if (!httpRes.ok) return fallback;
+      return await httpRes.json();
+    } catch {
+      return fallback;
+    }
   }
 }
 async function writeJsonFile(filename, data) {
@@ -65,7 +75,8 @@ async function writeJsonFile(filename, data) {
   await put(`solid-one/${filename}`, body, {
     access: "public",
     contentType: "application/json",
-    addRandomSuffix: false
+    addRandomSuffix: false,
+    allowOverwrite: true
   });
 }
 async function saveUploadedImage(buffer, filename, uploadsDir) {
@@ -1129,11 +1140,22 @@ async function handleDownloadInstall(session, body) {
     versionName: z5.string().max(32).optional()
   }).safeParse(body ?? {});
   const version = parsed.success ? parsed.data : void 0;
-  const result = await recordInstall(session, version);
-  return {
-    status: 200,
-    json: { ok: true, alreadyInstalled: result.alreadyInstalled, stats: result.stats }
-  };
+  try {
+    const result = await recordInstall(session, version);
+    return {
+      status: 200,
+      json: { ok: true, alreadyInstalled: result.alreadyInstalled, stats: result.stats }
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not save install.";
+    console.error("recordInstall failed:", err);
+    return {
+      status: 503,
+      json: {
+        error: message.includes("BLOB") ? "Server storage is not configured. Set BLOB_READ_WRITE_TOKEN on Vercel." : message
+      }
+    };
+  }
 }
 async function handleDownloadReleaseGet() {
   const release = await getApkReleaseInfo();
@@ -1364,7 +1386,10 @@ function createApp() {
   app2.use(cors({ origin: true, credentials: true }));
   app2.use(express.json({ limit: "2mb" }));
   app2.get("/api/health", (_req, res) => {
-    res.json({ ok: true });
+    res.json({
+      ok: true,
+      storage: useBlobStorage() ? "blob" : isVercelRuntime() ? "none" : "local"
+    });
   });
   app2.post(
     "/api/subscribe",

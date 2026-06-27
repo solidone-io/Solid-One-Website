@@ -60,7 +60,10 @@ export function createApp() {
   app.use(express.json({ limit: "2mb" }));
 
   app.get("/api/health", (_req, res) => {
-    res.json({ ok: true });
+    res.json({
+      ok: true,
+      storage: useBlobStorage() ? "blob" : isVercelRuntime() ? "none" : "local",
+    });
   });
 
   app.post(

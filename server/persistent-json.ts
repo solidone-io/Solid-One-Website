@@ -30,7 +30,7 @@ export async function readJsonFile<T>(filename: string, fallback: T): Promise<T>
     }
   }
 
-  const { head } = await import("@vercel/blob");
+  const { head, list } = await import("@vercel/blob");
   const blobPath = `solid-one/${filename}`;
   try {
     const meta = await head(blobPath);
@@ -38,7 +38,17 @@ export async function readJsonFile<T>(filename: string, fallback: T): Promise<T>
     if (!httpRes.ok) return fallback;
     return (await httpRes.json()) as T;
   } catch {
-    return fallback;
+    try {
+      const result = await list({ prefix: blobPath, limit: 20 });
+      const exact = result.blobs.find((b) => b.pathname === blobPath);
+      const blob = exact ?? result.blobs.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime())[0];
+      if (!blob) return fallback;
+      const httpRes = await fetch(blob.url);
+      if (!httpRes.ok) return fallback;
+      return (await httpRes.json()) as T;
+    } catch {
+      return fallback;
+    }
   }
 }
 
@@ -58,6 +68,7 @@ export async function writeJsonFile<T>(filename: string, data: T): Promise<void>
     access: "public",
     contentType: "application/json",
     addRandomSuffix: false,
+    allowOverwrite: true,
   });
 }
 

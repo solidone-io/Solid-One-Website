@@ -75,19 +75,48 @@ export async function fetchDownloadRelease(): Promise<ApkRelease> {
   return data.release;
 }
 
-export async function recordDownloadInstall(version?: {
+/** Fire-and-forget install record — survives page navigation on Android. */
+export function recordDownloadInstallKeepalive(version?: {
   versionCode?: number;
   versionName?: string;
-}): Promise<{
+}): void {
+  const token = getDownloadAuthToken();
+  if (!token) return;
+  void fetch(apiUrl("/api/download/install"), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(version ?? {}),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+export async function recordDownloadInstall(
+  version?: { versionCode?: number; versionName?: string },
+  retries = 3,
+): Promise<{
   alreadyInstalled: boolean;
   stats: DownloadStats;
 }> {
-  const data = await api<{ alreadyInstalled: boolean; stats: DownloadStats }>("/api/download/install", {
-    method: "POST",
-    auth: true,
-    body: JSON.stringify(version ?? {}),
-  });
-  return { alreadyInstalled: data.alreadyInstalled, stats: data.stats };
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const data = await api<{ alreadyInstalled: boolean; stats: DownloadStats }>("/api/download/install", {
+        method: "POST",
+        auth: true,
+        body: JSON.stringify(version ?? {}),
+      });
+      return { alreadyInstalled: data.alreadyInstalled, stats: data.stats };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error("Request failed.");
+      if (attempt < retries - 1) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError ?? new Error("Could not record install.");
 }
 
 export async function fetchMyDownloadReview(): Promise<DownloadReview | null> {

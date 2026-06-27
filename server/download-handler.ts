@@ -178,11 +178,24 @@ export async function handleDownloadInstall(
     })
     .safeParse(body ?? {});
   const version = parsed.success ? parsed.data : undefined;
-  const result = await recordInstall(session, version);
-  return {
-    status: 200,
-    json: { ok: true, alreadyInstalled: result.alreadyInstalled, stats: result.stats },
-  };
+  try {
+    const result = await recordInstall(session, version);
+    return {
+      status: 200,
+      json: { ok: true, alreadyInstalled: result.alreadyInstalled, stats: result.stats },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not save install.";
+    console.error("recordInstall failed:", err);
+    return {
+      status: 503,
+      json: {
+        error: message.includes("BLOB")
+          ? "Server storage is not configured. Set BLOB_READ_WRITE_TOKEN on Vercel."
+          : message,
+      },
+    };
+  }
 }
 
 export async function handleDownloadReleaseGet(): Promise<{ status: number; json: Record<string, unknown> }> {

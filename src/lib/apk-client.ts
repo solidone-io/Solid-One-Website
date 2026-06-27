@@ -103,6 +103,15 @@ export function triggerDirectApkDownload(url: string, fileName: string): void {
   a.remove();
 }
 
+/** Best for Android Chrome — hands off to the system download/install UI. */
+export function openApkDownload(url: string, fileName: string): void {
+  if (isAndroidDevice()) {
+    window.location.assign(url);
+    return;
+  }
+  triggerDirectApkDownload(url, fileName);
+}
+
 export async function downloadApkWithProgress(
   url: string,
   onProgress: (percent: number, loaded: number, total: number) => void,

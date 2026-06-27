@@ -1,29 +1,31 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, ExternalLink, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { GoogleSignInButton } from "@/components/download/GoogleSignInButton";
 import { DOWNLOAD_APP } from "@/content/download-app";
 import {
   clearLocalInstallState,
-  downloadApkWithProgress,
   formatBytes,
   getLocalInstallState,
   isAndroidDevice,
   openAndroidApp,
   openAndroidUninstall,
+  openApkDownload,
   probeAndroidAppInstalled,
   setLocalInstallState,
-  shouldUseDirectApkDownload,
-  triggerApkSave,
-  triggerDirectApkDownload,
 } from "@/lib/apk-client";
 import { apiUrl } from "@/lib/api-base";
-import { fetchDownloadRelease, recordDownloadInstall, type ApkRelease, type DownloadStats } from "@/lib/download-api";
+import {
+  fetchDownloadRelease,
+  recordDownloadInstall,
+  recordDownloadInstallKeepalive,
+  type ApkRelease,
+  type DownloadStats,
+} from "@/lib/download-api";
 import { clearDownloadAuth, getDownloadAuth } from "@/lib/download-auth";
 import { useToast } from "@/hooks/use-toast";
 
-type InstallPhase = "idle" | "downloading" | "installing" | "error";
+type InstallPhase = "idle" | "starting";
 
 type InstallActionBarProps = {
   onStatsChange?: (stats: DownloadStats) => void;
@@ -36,10 +38,6 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
   const [installed, setInstalled] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [phase, setPhase] = useState<InstallPhase>("idle");
-  const [progress, setProgress] = useState(0);
-  const [loadedBytes, setLoadedBytes] = useState(0);
-  const [totalBytes, setTotalBytes] = useState(0);
-  const [error, setError] = useState<string | null>(null);
 
   const syncAuth = useCallback(() => setAuthed(Boolean(getDownloadAuth())), []);
 
@@ -69,7 +67,7 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
     };
   }, [refreshReleaseState, syncAuth]);
 
-  const runDownload = async (isUpdate: boolean) => {
+  const runDownload = (isUpdate: boolean) => {
     const auth = getDownloadAuth();
     if (!auth || !release) return;
 
@@ -78,64 +76,29 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
       versionName: release.versionName,
     };
 
-    setPhase("downloading");
-    setProgress(0);
-    setError(null);
+    setPhase("starting");
 
-    try {
-      // Record install first so admin always sees it, even if the browser handles the APK on its own.
-      const result = await recordDownloadInstall(version);
-      onStatsChange?.(result.stats);
-
-      const apkUrl = apiUrl(release.downloadPath);
-
-      if (shouldUseDirectApkDownload(release.size)) {
-        setPhase("installing");
-        triggerDirectApkDownload(apkUrl, release.fileName);
-        setLocalInstallState(version);
-
-        toast({
-          title: isUpdate ? "Update started" : "Download started",
-          description: isAndroidDevice()
-            ? "Chrome will download and prompt you to install. Tap Install when asked."
-            : "Check your browser downloads — open the APK on your Android device to install.",
-        });
-
-        await refreshReleaseState();
-        setPhase("idle");
-        return;
-      }
-
-      const { blob } = await downloadApkWithProgress(
-        apkUrl,
-        (pct, loaded, total) => {
-          setProgress(pct);
-          setLoadedBytes(loaded);
-          setTotalBytes(total);
-        },
-        version,
-      );
-
-      setPhase("installing");
-      triggerApkSave(blob, release.fileName);
-      setLocalInstallState(version);
-
-      toast({
-        title: "Download complete",
-        description: "Open the downloaded APK to install Solid One.",
+    // Record on server (keepalive survives Android navigation) + retry in background.
+    recordDownloadInstallKeepalive(version);
+    void recordDownloadInstall(version)
+      .then((result) => onStatsChange?.(result.stats))
+      .catch(() => {
+        /* download still proceeds — admin may update on retry/keepalive */
       });
 
-      await refreshReleaseState();
-      setPhase("idle");
-    } catch (err) {
-      setPhase("error");
-      setError(err instanceof Error ? err.message : "Download failed.");
-      toast({
-        title: "Something went wrong",
-        description: err instanceof Error ? err.message : "Try again.",
-        variant: "destructive",
-      });
-    }
+    setLocalInstallState(version);
+
+    const apkUrl = `${apiUrl(release.downloadPath)}?v=${encodeURIComponent(release.versionName)}`;
+    openApkDownload(apkUrl, release.fileName);
+
+    toast({
+      title: isUpdate ? "Update started" : "Download started",
+      description: isAndroidDevice()
+        ? "Chrome will download the app. Tap Install when prompted."
+        : "Open the downloaded APK on your Android device to install.",
+    });
+
+    window.setTimeout(() => setPhase("idle"), 1500);
   };
 
   const handleUninstall = () => {
@@ -186,32 +149,14 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
     );
   }
 
-  if (phase === "downloading" || phase === "installing") {
-    const direct = release ? shouldUseDirectApkDownload(release.size) : false;
+  if (phase === "starting") {
     return (
       <div className="mt-6 space-y-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
         <div className="flex items-center gap-2 text-emerald-300">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-[14px] font-medium">
-            {phase === "installing" || direct
-              ? "Starting download…"
-              : "Downloading…"}
-          </span>
+          <span className="text-[14px] font-medium">Starting download…</span>
         </div>
-        {!direct && (
-          <>
-            <Progress value={progress} className="h-2 bg-white/10" />
-            <p className="text-[12px] text-white/45 tabular-nums">
-              {progress}% · {formatBytes(loadedBytes)}
-              {totalBytes > 0 ? ` / ${formatBytes(totalBytes)}` : ""}
-            </p>
-          </>
-        )}
-        {direct && (
-          <p className="text-[12px] text-white/45">
-            Chrome will handle the download and install prompt.
-          </p>
-        )}
+        <p className="text-[12px] text-white/45">Chrome will handle the download and install prompt.</p>
       </div>
     );
   }
@@ -278,7 +223,7 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
       <Button
         className="w-full h-12 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-[15px]"
         onClick={() => runDownload(false)}
-        disabled={!release || phase === "error"}
+        disabled={!release}
       >
         <Download className="h-5 w-5 mr-2" />
         Install
@@ -288,10 +233,6 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
         <p className="text-[11px] text-white/35 text-center">
           v{release.versionName} · {formatBytes(release.size)} · Android
         </p>
-      )}
-
-      {error && (
-        <p className="text-[12px] text-red-400/90 text-center">{error}</p>
       )}
 
       {auth && (
