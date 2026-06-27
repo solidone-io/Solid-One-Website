@@ -25,11 +25,40 @@ function useBlobStorage() {
   if (process.env.BLOB_READ_WRITE_TOKEN) return true;
   return isVercelRuntime() && Boolean(process.env.BLOB_STORE_ID);
 }
+function blobAccess() {
+  const mode = process.env.BLOB_ACCESS?.trim().toLowerCase();
+  return mode === "public" ? "public" : "private";
+}
 function ensureLocalDataDir() {
   if (useBlobStorage() || isVercelRuntime()) return;
   try {
     mkdirSync(dataDir, { recursive: true });
   } catch {
+  }
+}
+async function readBlobJson(filename, fallback) {
+  const { get, list } = await import("@vercel/blob");
+  const blobPath = `solid-one/${filename}`;
+  const access = blobAccess();
+  try {
+    const result = await get(blobPath, { access });
+    if (result.statusCode === 200 && result.stream) {
+      const text = await new Response(result.stream).text();
+      return JSON.parse(text);
+    }
+  } catch {
+  }
+  try {
+    const result = await list({ prefix: blobPath, limit: 20 });
+    const exact = result.blobs.find((b) => b.pathname === blobPath);
+    const blob = exact ?? result.blobs.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime())[0];
+    if (!blob) return fallback;
+    const blobResult = await get(blob.pathname, { access });
+    if (blobResult.statusCode !== 200 || !blobResult.stream) return fallback;
+    const text = await new Response(blobResult.stream).text();
+    return JSON.parse(text);
+  } catch {
+    return fallback;
   }
 }
 async function readJsonFile(filename, fallback) {
@@ -41,26 +70,7 @@ async function readJsonFile(filename, fallback) {
       return fallback;
     }
   }
-  const { head, list } = await import("@vercel/blob");
-  const blobPath = `solid-one/${filename}`;
-  try {
-    const meta = await head(blobPath);
-    const httpRes = await fetch(meta.url);
-    if (!httpRes.ok) return fallback;
-    return await httpRes.json();
-  } catch {
-    try {
-      const result = await list({ prefix: blobPath, limit: 20 });
-      const exact = result.blobs.find((b) => b.pathname === blobPath);
-      const blob = exact ?? result.blobs.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime())[0];
-      if (!blob) return fallback;
-      const httpRes = await fetch(blob.url);
-      if (!httpRes.ok) return fallback;
-      return await httpRes.json();
-    } catch {
-      return fallback;
-    }
-  }
+  return readBlobJson(filename, fallback);
 }
 async function writeJsonFile(filename, data) {
   const body = JSON.stringify(data, null, 2);
@@ -74,7 +84,7 @@ async function writeJsonFile(filename, data) {
   }
   const { put } = await import("@vercel/blob");
   await put(`solid-one/${filename}`, body, {
-    access: "public",
+    access: blobAccess(),
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true
@@ -91,7 +101,7 @@ async function saveUploadedImage(buffer, filename, uploadsDir) {
   const ext = path.extname(filename).toLowerCase();
   const contentType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : ext === ".gif" ? "image/gif" : "image/jpeg";
   const blob = await put(`solid-one/uploads/${filename}`, buffer, {
-    access: "public",
+    access: blobAccess(),
     contentType
   });
   return blob.url;
@@ -993,8 +1003,8 @@ import path3 from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 var __dirname2 = path3.dirname(fileURLToPath2(import.meta.url));
 var APK_PACKAGE = "io.solidone.app";
-var APK_VERSION_CODE = Number(process.env.APK_VERSION_CODE ?? "1") || 1;
-var APK_VERSION_NAME = (process.env.APK_VERSION_NAME ?? "1.0.3").trim() || "1.0.3";
+var APK_VERSION_CODE = Number(process.env.APK_VERSION_CODE ?? "4") || 4;
+var APK_VERSION_NAME = (process.env.APK_VERSION_NAME ?? "1.0.6").trim() || "1.0.6";
 var APK_FILE_NAME = "solid-one.apk";
 var APK_PUBLIC_PATH = `/releases/${APK_FILE_NAME}`;
 var sha256Cache = null;
@@ -1153,7 +1163,7 @@ async function handleDownloadInstall(session, body) {
     return {
       status: 503,
       json: {
-        error: message.includes("BLOB") ? "Server storage is not configured. Set BLOB_READ_WRITE_TOKEN on Vercel." : message
+        error: message.includes("Blob") || message.includes("BLOB") ? "Server storage error. Try again in a moment." : message
       }
     };
   }
@@ -1207,22 +1217,33 @@ async function handleDownloadReviewPost(session, body) {
   if (!parsed.success) {
     return { status: 400, json: { error: validationError2(parsed.error) } };
   }
-  const result = await addReview({
-    googleSub: session.sub,
-    userEmail: session.email,
-    userName: session.name,
-    userPicture: session.picture,
-    stars: parsed.data.stars,
-    text: parsed.data.text
-  });
-  if (!result.ok) {
-    return { status: 409, json: { error: "error" in result ? result.error : "Review failed." } };
+  try {
+    const result = await addReview({
+      googleSub: session.sub,
+      userEmail: session.email,
+      userName: session.name,
+      userPicture: session.picture,
+      stars: parsed.data.stars,
+      text: parsed.data.text
+    });
+    if (!result.ok) {
+      return { status: 409, json: { error: "error" in result ? result.error : "Review failed." } };
+    }
+    const stats = await getDownloadStats();
+    return {
+      status: 200,
+      json: { ok: true, review: serializeReview(result.review), stats }
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not save review.";
+    console.error("addReview failed:", err);
+    return {
+      status: 503,
+      json: {
+        error: message.includes("Blob") || message.includes("BLOB") ? "Server storage error. Try again in a moment." : message
+      }
+    };
   }
-  const stats = await getDownloadStats();
-  return {
-    status: 200,
-    json: { ok: true, review: serializeReview(result.review), stats }
-  };
 }
 async function handleDownloadReviewHelpful(session, reviewId, body) {
   if (!session) return { status: 401, json: { error: "Sign in required." } };

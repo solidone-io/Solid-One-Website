@@ -190,8 +190,8 @@ export async function handleDownloadInstall(
     return {
       status: 503,
       json: {
-        error: message.includes("BLOB")
-          ? "Server storage is not configured. Set BLOB_READ_WRITE_TOKEN on Vercel."
+        error: message.includes("Blob") || message.includes("BLOB")
+          ? "Server storage error. Try again in a moment."
           : message,
       },
     };
@@ -268,22 +268,35 @@ export async function handleDownloadReviewPost(
     return { status: 400, json: { error: validationError(parsed.error) } };
   }
 
-  const result = await addReview({
-    googleSub: session.sub,
-    userEmail: session.email,
-    userName: session.name,
-    userPicture: session.picture,
-    stars: parsed.data.stars,
-    text: parsed.data.text,
-  });
-  if (!result.ok) {
-    return { status: 409, json: { error: "error" in result ? result.error : "Review failed." } };
+  try {
+    const result = await addReview({
+      googleSub: session.sub,
+      userEmail: session.email,
+      userName: session.name,
+      userPicture: session.picture,
+      stars: parsed.data.stars,
+      text: parsed.data.text,
+    });
+    if (!result.ok) {
+      return { status: 409, json: { error: "error" in result ? result.error : "Review failed." } };
+    }
+    const stats = await getDownloadStats();
+    return {
+      status: 200,
+      json: { ok: true, review: serializeReview(result.review), stats },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not save review.";
+    console.error("addReview failed:", err);
+    return {
+      status: 503,
+      json: {
+        error: message.includes("Blob") || message.includes("BLOB")
+          ? "Server storage error. Try again in a moment."
+          : message,
+      },
+    };
   }
-  const stats = await getDownloadStats();
-  return {
-    status: 200,
-    json: { ok: true, review: serializeReview(result.review), stats },
-  };
 }
 
 export async function handleDownloadReviewHelpful(

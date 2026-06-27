@@ -12,6 +12,12 @@ export function useBlobStorage(): boolean {
   return isVercelRuntime() && Boolean(process.env.BLOB_STORE_ID);
 }
 
+/** Private stores (default on this project) require private access + SDK reads. */
+export function blobAccess(): "public" | "private" {
+  const mode = process.env.BLOB_ACCESS?.trim().toLowerCase();
+  return mode === "public" ? "public" : "private";
+}
+
 /** Local dev only — Vercel serverless has a read-only project filesystem. */
 function ensureLocalDataDir(): void {
   if (useBlobStorage() || isVercelRuntime()) return;
@@ -19,6 +25,36 @@ function ensureLocalDataDir(): void {
     mkdirSync(dataDir, { recursive: true });
   } catch {
     // ignore EROFS / permission errors
+  }
+}
+
+async function readBlobJson<T>(filename: string, fallback: T): Promise<T> {
+  const { get, list } = await import("@vercel/blob");
+  const blobPath = `solid-one/${filename}`;
+  const access = blobAccess();
+
+  try {
+    const result = await get(blobPath, { access });
+    if (result.statusCode === 200 && result.stream) {
+      const text = await new Response(result.stream).text();
+      return JSON.parse(text) as T;
+    }
+  } catch {
+    // fall through to list lookup
+  }
+
+  try {
+    const result = await list({ prefix: blobPath, limit: 20 });
+    const exact = result.blobs.find((b) => b.pathname === blobPath);
+    const blob = exact ?? result.blobs.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime())[0];
+    if (!blob) return fallback;
+
+    const blobResult = await get(blob.pathname, { access });
+    if (blobResult.statusCode !== 200 || !blobResult.stream) return fallback;
+    const text = await new Response(blobResult.stream).text();
+    return JSON.parse(text) as T;
+  } catch {
+    return fallback;
   }
 }
 
@@ -32,26 +68,7 @@ export async function readJsonFile<T>(filename: string, fallback: T): Promise<T>
     }
   }
 
-  const { head, list } = await import("@vercel/blob");
-  const blobPath = `solid-one/${filename}`;
-  try {
-    const meta = await head(blobPath);
-    const httpRes = await fetch(meta.url);
-    if (!httpRes.ok) return fallback;
-    return (await httpRes.json()) as T;
-  } catch {
-    try {
-      const result = await list({ prefix: blobPath, limit: 20 });
-      const exact = result.blobs.find((b) => b.pathname === blobPath);
-      const blob = exact ?? result.blobs.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime())[0];
-      if (!blob) return fallback;
-      const httpRes = await fetch(blob.url);
-      if (!httpRes.ok) return fallback;
-      return (await httpRes.json()) as T;
-    } catch {
-      return fallback;
-    }
-  }
+  return readBlobJson(filename, fallback);
 }
 
 export async function writeJsonFile<T>(filename: string, data: T): Promise<void> {
@@ -67,7 +84,7 @@ export async function writeJsonFile<T>(filename: string, data: T): Promise<void>
 
   const { put } = await import("@vercel/blob");
   await put(`solid-one/${filename}`, body, {
-    access: "public",
+    access: blobAccess(),
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true,
@@ -91,7 +108,7 @@ export async function saveUploadedImage(
   const contentType =
     ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : ext === ".gif" ? "image/gif" : "image/jpeg";
   const blob = await put(`solid-one/uploads/${filename}`, buffer, {
-    access: "public",
+    access: blobAccess(),
     contentType,
   });
   return blob.url;

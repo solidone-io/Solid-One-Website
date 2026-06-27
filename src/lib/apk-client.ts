@@ -103,10 +103,10 @@ export function triggerDirectApkDownload(url: string, fileName: string): void {
   a.remove();
 }
 
-/** Best for Android Chrome — hands off to the system download/install UI. */
+/** Android: new tab keeps this page alive so install/review API calls finish. */
 export function openApkDownload(url: string, fileName: string): void {
   if (isAndroidDevice()) {
-    window.location.assign(url);
+    window.open(url, "_blank", "noopener,noreferrer");
     return;
   }
   triggerDirectApkDownload(url, fileName);
