@@ -18,9 +18,16 @@ export type LocalInstallState = {
 
 const LOCAL_KEY = "solid_one_apk_install";
 
+/** APKs over this size must not be loaded into JS memory (mobile OOM after 100%). */
+const DIRECT_DOWNLOAD_BYTES = 10 * 1024 * 1024;
+
 export function isAndroidDevice(): boolean {
   if (typeof navigator === "undefined") return false;
   return /Android/i.test(navigator.userAgent);
+}
+
+export function shouldUseDirectApkDownload(sizeBytes: number): boolean {
+  return isAndroidDevice() || sizeBytes > DIRECT_DOWNLOAD_BYTES;
 }
 
 export function getLocalInstallState(): LocalInstallState | null {
@@ -83,6 +90,17 @@ export function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
   if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(0)} KB`;
   return `${bytes} B`;
+}
+
+/** Let the browser download the APK natively — no 52 MB blob in memory. */
+export function triggerDirectApkDownload(url: string, fileName: string): void {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 export async function downloadApkWithProgress(

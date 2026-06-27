@@ -40,17 +40,23 @@ async function readJsonFile(filename, fallback) {
       return fallback;
     }
   }
-  const { list } = await import("@vercel/blob");
+  const { head } = await import("@vercel/blob");
   const blobPath = `solid-one/${filename}`;
-  const result = await list({ prefix: blobPath, limit: 1 });
-  if (!result.blobs.length) return fallback;
-  const httpRes = await fetch(result.blobs[0].url);
-  if (!httpRes.ok) return fallback;
-  return await httpRes.json();
+  try {
+    const meta = await head(blobPath);
+    const httpRes = await fetch(meta.url);
+    if (!httpRes.ok) return fallback;
+    return await httpRes.json();
+  } catch {
+    return fallback;
+  }
 }
 async function writeJsonFile(filename, data) {
   const body = JSON.stringify(data, null, 2);
   if (!useBlobStorage()) {
+    if (isVercelRuntime()) {
+      throw new Error("BLOB_READ_WRITE_TOKEN is required on Vercel to save website data.");
+    }
     ensureLocalDataDir();
     writeFileSync(path.join(dataDir, filename), body, "utf8");
     return;
@@ -58,7 +64,8 @@ async function writeJsonFile(filename, data) {
   const { put } = await import("@vercel/blob");
   await put(`solid-one/${filename}`, body, {
     access: "public",
-    contentType: "application/json"
+    contentType: "application/json",
+    addRandomSuffix: false
   });
 }
 async function saveUploadedImage(buffer, filename, uploadsDir) {

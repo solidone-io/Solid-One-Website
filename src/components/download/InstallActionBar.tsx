@@ -14,7 +14,9 @@ import {
   openAndroidUninstall,
   probeAndroidAppInstalled,
   setLocalInstallState,
+  shouldUseDirectApkDownload,
   triggerApkSave,
+  triggerDirectApkDownload,
 } from "@/lib/apk-client";
 import { apiUrl } from "@/lib/api-base";
 import { fetchDownloadRelease, recordDownloadInstall, type ApkRelease, type DownloadStats } from "@/lib/download-api";
@@ -71,46 +73,57 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
     const auth = getDownloadAuth();
     if (!auth || !release) return;
 
+    const version = {
+      versionCode: release.versionCode,
+      versionName: release.versionName,
+    };
+
     setPhase("downloading");
     setProgress(0);
     setError(null);
 
     try {
-      const { blob, versionCode, versionName } = await downloadApkWithProgress(
-        apiUrl(release.downloadPath),
+      // Record install first so admin always sees it, even if the browser handles the APK on its own.
+      const result = await recordDownloadInstall(version);
+      onStatsChange?.(result.stats);
+
+      const apkUrl = apiUrl(release.downloadPath);
+
+      if (shouldUseDirectApkDownload(release.size)) {
+        setPhase("installing");
+        triggerDirectApkDownload(apkUrl, release.fileName);
+        setLocalInstallState(version);
+
+        toast({
+          title: isUpdate ? "Update started" : "Download started",
+          description: isAndroidDevice()
+            ? "Chrome will download and prompt you to install. Tap Install when asked."
+            : "Check your browser downloads — open the APK on your Android device to install.",
+        });
+
+        await refreshReleaseState();
+        setPhase("idle");
+        return;
+      }
+
+      const { blob } = await downloadApkWithProgress(
+        apkUrl,
         (pct, loaded, total) => {
           setProgress(pct);
           setLoadedBytes(loaded);
           setTotalBytes(total);
         },
-        { versionCode: release.versionCode, versionName: release.versionName },
+        version,
       );
 
       setPhase("installing");
       triggerApkSave(blob, release.fileName);
-
-      const version = {
-        versionCode: versionCode || release.versionCode,
-        versionName: versionName || release.versionName,
-      };
-
-      const result = await recordDownloadInstall(version);
-      onStatsChange?.(result.stats);
       setLocalInstallState(version);
 
-      if (isUpdate) {
-        toast({
-          title: "Update downloaded",
-          description: "Open the APK from Downloads to update. If install fails, uninstall the old app first.",
-        });
-      } else {
-        toast({
-          title: "Download complete",
-          description: isAndroidDevice()
-            ? "Open your Downloads folder and tap the APK to install."
-            : "Transfer the APK to your Android phone to install.",
-        });
-      }
+      toast({
+        title: "Download complete",
+        description: "Open the downloaded APK to install Solid One.",
+      });
 
       await refreshReleaseState();
       setPhase("idle");
@@ -118,7 +131,7 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
       setPhase("error");
       setError(err instanceof Error ? err.message : "Download failed.");
       toast({
-        title: "Download failed",
+        title: "Something went wrong",
         description: err instanceof Error ? err.message : "Try again.",
         variant: "destructive",
       });
@@ -174,19 +187,31 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
   }
 
   if (phase === "downloading" || phase === "installing") {
+    const direct = release ? shouldUseDirectApkDownload(release.size) : false;
     return (
       <div className="mt-6 space-y-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
         <div className="flex items-center gap-2 text-emerald-300">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span className="text-[14px] font-medium">
-            {phase === "downloading" ? "Downloading…" : "Preparing install…"}
+            {phase === "installing" || direct
+              ? "Starting download…"
+              : "Downloading…"}
           </span>
         </div>
-        <Progress value={progress} className="h-2 bg-white/10" />
-        <p className="text-[12px] text-white/45 tabular-nums">
-          {progress}% · {formatBytes(loadedBytes)}
-          {totalBytes > 0 ? ` / ${formatBytes(totalBytes)}` : ""}
-        </p>
+        {!direct && (
+          <>
+            <Progress value={progress} className="h-2 bg-white/10" />
+            <p className="text-[12px] text-white/45 tabular-nums">
+              {progress}% · {formatBytes(loadedBytes)}
+              {totalBytes > 0 ? ` / ${formatBytes(totalBytes)}` : ""}
+            </p>
+          </>
+        )}
+        {direct && (
+          <p className="text-[12px] text-white/45">
+            Chrome will handle the download and install prompt.
+          </p>
+        )}
       </div>
     );
   }

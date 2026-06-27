@@ -30,18 +30,24 @@ export async function readJsonFile<T>(filename: string, fallback: T): Promise<T>
     }
   }
 
-  const { list } = await import("@vercel/blob");
+  const { head } = await import("@vercel/blob");
   const blobPath = `solid-one/${filename}`;
-  const result = await list({ prefix: blobPath, limit: 1 });
-  if (!result.blobs.length) return fallback;
-  const httpRes = await fetch(result.blobs[0].url);
-  if (!httpRes.ok) return fallback;
-  return (await httpRes.json()) as T;
+  try {
+    const meta = await head(blobPath);
+    const httpRes = await fetch(meta.url);
+    if (!httpRes.ok) return fallback;
+    return (await httpRes.json()) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 export async function writeJsonFile<T>(filename: string, data: T): Promise<void> {
   const body = JSON.stringify(data, null, 2);
   if (!useBlobStorage()) {
+    if (isVercelRuntime()) {
+      throw new Error("BLOB_READ_WRITE_TOKEN is required on Vercel to save website data.");
+    }
     ensureLocalDataDir();
     writeFileSync(path.join(dataDir, filename), body, "utf8");
     return;
@@ -51,6 +57,7 @@ export async function writeJsonFile<T>(filename: string, data: T): Promise<void>
   await put(`solid-one/${filename}`, body, {
     access: "public",
     contentType: "application/json",
+    addRandomSuffix: false,
   });
 }
 
