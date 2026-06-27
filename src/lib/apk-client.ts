@@ -117,34 +117,37 @@ export async function downloadApkWithProgress(
   onProgress: (percent: number, loaded: number, total: number) => void,
   fallback?: { versionCode: number; versionName: string },
 ): Promise<{ blob: Blob; versionCode: number; versionName: string }> {
-  const res = await fetch(url);
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", url);
+    xhr.responseType = "blob";
 
-  if (!res.ok) {
-    throw new Error("Download failed. Try again in a moment.");
-  }
+    xhr.onprogress = (event) => {
+      const total = event.lengthComputable ? event.total : 0;
+      const loaded = event.loaded;
+      const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+      onProgress(percent, loaded, total);
+    };
 
-  const total = Number(res.headers.get("content-length") ?? 0);
-  const versionCode = Number(res.headers.get("x-apk-version-code") ?? 0) || fallback?.versionCode || 0;
-  const versionName = res.headers.get("x-apk-version-name") ?? fallback?.versionName ?? "";
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new Error("Download failed. Try again in a moment."));
+        return;
+      }
 
-  if (!res.body) throw new Error("Download stream unavailable.");
+      const blob = xhr.response as Blob;
+      const versionCode =
+        Number(xhr.getResponseHeader("x-apk-version-code") ?? 0) || fallback?.versionCode || 0;
+      const versionName = xhr.getResponseHeader("x-apk-version-name") ?? fallback?.versionName ?? "";
+      const total = blob.size;
+      onProgress(100, total, total);
+      resolve({ blob, versionCode, versionName });
+    };
 
-  const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let loaded = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    loaded += value.length;
-    const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
-    onProgress(percent, loaded, total);
-  }
-
-  onProgress(100, loaded, total || loaded);
-  const blob = new Blob(chunks as BlobPart[], { type: "application/vnd.android.package-archive" });
-  return { blob, versionCode, versionName };
+    xhr.onerror = () => reject(new Error("Download failed. Check your connection and try again."));
+    xhr.onabort = () => reject(new Error("Download cancelled."));
+    xhr.send();
+  });
 }
 
 export function triggerApkSave(blob: Blob, fileName: string): void {

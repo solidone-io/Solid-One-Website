@@ -6,6 +6,7 @@ import { GoogleSignInButton } from "@/components/download/GoogleSignInButton";
 import { DOWNLOAD_APP } from "@/content/download-app";
 import {
   clearLocalInstallState,
+  downloadApkWithProgress,
   formatBytes,
   getLocalInstallState,
   isAndroidDevice,
@@ -14,6 +15,7 @@ import {
   openApkDownload,
   probeAndroidAppInstalled,
   setLocalInstallState,
+  triggerApkSave,
 } from "@/lib/apk-client";
 import { apiUrl } from "@/lib/api-base";
 import {
@@ -26,62 +28,7 @@ import {
 import { clearDownloadAuth, getDownloadAuth } from "@/lib/download-auth";
 import { useToast } from "@/hooks/use-toast";
 
-type InstallPhase = "idle" | "downloading";
-
-function DownloadInProgressPanel({
-  release,
-  isUpdate,
-  onDone,
-}: {
-  release: ApkRelease;
-  isUpdate: boolean;
-  onDone: () => void;
-}) {
-  const [pulse, setPulse] = useState(12);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setPulse((v) => (v >= 88 ? 18 : v + 7));
-    }, 450);
-    return () => clearInterval(id);
-  }, []);
-
-  return (
-    <div className="mt-6 space-y-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
-      <div className="flex items-center gap-2 text-emerald-300">
-        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-        <span className="text-[14px] font-medium">
-          {isUpdate ? "Update downloading…" : "Download in progress…"}
-        </span>
-      </div>
-
-      <Progress value={pulse} className="h-2 bg-white/10 [&>div]:bg-emerald-400" />
-
-      <div className="space-y-1.5 text-[12px] text-white/50 leading-relaxed">
-        {isAndroidDevice() ? (
-          <>
-            <p>Chrome is downloading the APK (~{formatBytes(release.size)}). Progress appears in Chrome, not on this page.</p>
-            <p>
-              <span className="text-white/70">Where to look:</span> pull down the notification shade, or tap Chrome&apos;s
-              menu (⋮) → <span className="text-white/70">Downloads</span>.
-            </p>
-            <p>When the download finishes, tap the file and choose Install.</p>
-          </>
-        ) : (
-          <p>Your browser is downloading the APK. Check your downloads folder, then transfer it to your Android phone.</p>
-        )}
-      </div>
-
-      <Button
-        variant="outline"
-        className="w-full h-10 rounded-full border-white/15 text-white/80 hover:bg-white/5"
-        onClick={onDone}
-      >
-        Back to download page
-      </Button>
-    </div>
-  );
-}
+type InstallPhase = "idle" | "downloading" | "installing" | "error";
 
 type InstallActionBarProps = {
   onStatsChange?: (stats: DownloadStats) => void;
@@ -94,7 +41,10 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
   const [installed, setInstalled] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [phase, setPhase] = useState<InstallPhase>("idle");
-  const [downloadIsUpdate, setDownloadIsUpdate] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [loadedBytes, setLoadedBytes] = useState(0);
+  const [totalBytes, setTotalBytes] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const syncAuth = useCallback(() => setAuthed(Boolean(getDownloadAuth())), []);
 
@@ -124,7 +74,7 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
     };
   }, [refreshReleaseState, syncAuth]);
 
-  const runDownload = (isUpdate: boolean) => {
+  const runDownload = async (isUpdate: boolean) => {
     const auth = getDownloadAuth();
     if (!auth || !release) return;
 
@@ -133,28 +83,72 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
       versionName: release.versionName,
     };
 
-    setDownloadIsUpdate(isUpdate);
     setPhase("downloading");
+    setProgress(0);
+    setLoadedBytes(0);
+    setTotalBytes(release.size);
+    setError(null);
 
-    // Record on server (keepalive survives Android navigation) + retry in background.
     recordDownloadInstallKeepalive(version);
-    void recordDownloadInstall(version)
-      .then((result) => onStatsChange?.(result.stats))
-      .catch(() => {
-        /* download still proceeds — admin may update on retry/keepalive */
-      });
-
-    setLocalInstallState(version);
 
     const apkUrl = `${apiUrl(release.downloadPath)}?v=${encodeURIComponent(release.versionName)}`;
-    openApkDownload(apkUrl, release.fileName);
 
-    toast({
-      title: isUpdate ? "Update started" : "Download started",
-      description: isAndroidDevice()
-        ? "Check Chrome notifications or Downloads for progress."
-        : "Open the downloaded APK on your Android device to install.",
-    });
+    try {
+      const { blob, versionCode, versionName } = await downloadApkWithProgress(
+        apkUrl,
+        (pct, loaded, total) => {
+          setProgress(pct);
+          setLoadedBytes(loaded);
+          if (total > 0) setTotalBytes(total);
+        },
+        version,
+      );
+
+      setPhase("installing");
+
+      try {
+        triggerApkSave(blob, release.fileName);
+      } catch {
+        openApkDownload(apkUrl, release.fileName);
+      }
+
+      const savedVersion = {
+        versionCode: versionCode || release.versionCode,
+        versionName: versionName || release.versionName,
+      };
+      setLocalInstallState(savedVersion);
+
+      void recordDownloadInstall(savedVersion)
+        .then((result) => onStatsChange?.(result.stats))
+        .catch(() => {
+          /* install record retried via keepalive */
+        });
+
+      if (isUpdate) {
+        toast({
+          title: "Update downloaded",
+          description: "Open the APK from Downloads to update. If install fails, uninstall the old app first.",
+        });
+      } else {
+        toast({
+          title: "Download complete",
+          description: isAndroidDevice()
+            ? "Open your Downloads folder and tap the APK to install."
+            : "Transfer the APK to your Android phone to install.",
+        });
+      }
+
+      await refreshReleaseState();
+      setPhase("idle");
+    } catch (err) {
+      setPhase("error");
+      setError(err instanceof Error ? err.message : "Download failed.");
+      toast({
+        title: "Download failed",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleUninstall = () => {
@@ -205,13 +199,21 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
     );
   }
 
-  if (phase === "downloading" && release) {
+  if (phase === "downloading" || phase === "installing") {
     return (
-      <DownloadInProgressPanel
-        release={release}
-        isUpdate={downloadIsUpdate}
-        onDone={() => setPhase("idle")}
-      />
+      <div className="mt-6 space-y-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
+        <div className="flex items-center gap-2 text-emerald-300">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-[14px] font-medium">
+            {phase === "downloading" ? "Downloading…" : "Preparing install…"}
+          </span>
+        </div>
+        <Progress value={progress} className="h-2 bg-white/10" />
+        <p className="text-[12px] text-white/45 tabular-nums">
+          {progress}% · {formatBytes(loadedBytes)}
+          {totalBytes > 0 ? ` / ${formatBytes(totalBytes)}` : ""}
+        </p>
+      </div>
     );
   }
 
@@ -277,7 +279,7 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
       <Button
         className="w-full h-12 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-[15px]"
         onClick={() => runDownload(false)}
-        disabled={!release}
+        disabled={!release || phase === "error"}
       >
         <Download className="h-5 w-5 mr-2" />
         Install
@@ -288,6 +290,8 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
           v{release.versionName} · {formatBytes(release.size)} · Android
         </p>
       )}
+
+      {error && <p className="text-[12px] text-red-400/90 text-center">{error}</p>}
 
       {auth && (
         <p className="text-[12px] text-white/35 text-center">
