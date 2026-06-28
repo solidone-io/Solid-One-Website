@@ -7,8 +7,8 @@ import type { Response } from "express";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const APK_PACKAGE = "io.solidone.app";
-export const APK_VERSION_CODE = Number(process.env.APK_VERSION_CODE ?? "4") || 4;
-export const APK_VERSION_NAME = (process.env.APK_VERSION_NAME ?? "1.0.6").trim() || "1.0.6";
+export const APK_VERSION_CODE = Number(process.env.APK_VERSION_CODE ?? "5") || 5;
+export const APK_VERSION_NAME = (process.env.APK_VERSION_NAME ?? "1.0.7").trim() || "1.0.7";
 export const APK_FILE_NAME = "solid-one.apk";
 /** Served as a static asset (Vercel CDN) — avoids the 4.5 MB serverless response limit. */
 export const APK_PUBLIC_PATH = `/releases/${APK_FILE_NAME}`;
