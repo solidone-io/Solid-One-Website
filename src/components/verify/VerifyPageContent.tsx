@@ -6,17 +6,30 @@ import {
   Globe,
   Mail,
   Search,
+  ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
 import { FaTelegram, FaXTwitter } from "react-icons/fa6";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  fetchOfficialChannelLists,
-  verifyChannel,
-  type VerifiedChannel,
-  type VerifyResult,
-} from "@/lib/verify-api";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { verifyChannel, type VerifiedChannel, type VerifyResult } from "@/lib/verify-api";
+
+const VERIFY_WARNING_KEY = "solidone.verify.warning.v1";
+
+const SAFETY_WARNINGS = [
+  "Solid One will never ask for your seed phrase, private keys, or wallet recovery words in chat, email, or social DMs.",
+  "We will never ask you to send crypto, SOL, USDC, or any payment to verify your account or unlock a feature.",
+  "Official support is only through verified channels you confirm on this page. Impersonators often use look alike handles.",
+  "If someone pressures you to act quickly, offers guaranteed returns, or requests remote access to your phone, stop and verify here.",
+];
 
 function kindIcon(kind: VerifiedChannel["kind"]) {
   if (kind === "x") return FaXTwitter;
@@ -43,16 +56,16 @@ function ChannelAvatar({ channel }: { channel: VerifiedChannel }) {
         <img
           src={channel.avatarUrl!}
           alt=""
-          className="h-14 w-14 rounded-full object-cover border-2 border-emerald-500/40 bg-white/5"
+          className="h-16 w-16 rounded-full object-cover border border-white/20 bg-white/5"
           onError={() => setFailed(true)}
         />
       ) : (
-        <div className="h-14 w-14 rounded-full border-2 border-white/10 bg-white/5 flex items-center justify-center">
-          <Icon className="h-6 w-6 text-white/60" />
+        <div className="h-16 w-16 rounded-full border border-white/15 bg-white/[0.04] flex items-center justify-center">
+          <Icon className="h-7 w-7 text-white/55" />
         </div>
       )}
-      <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-black ring-2 ring-[#0a0a0a]">
-        <BadgeCheck className="h-4 w-4" aria-hidden />
+      <span className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-black ring-2 ring-[#050505]">
+        <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
       </span>
     </div>
   );
@@ -62,10 +75,8 @@ function RoleBadge({ role }: { role: VerifiedChannel["role"] }) {
   const isOfficial = role === "official";
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-        isOfficial
-          ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25"
-          : "bg-amber-500/10 text-amber-200 border border-amber-500/20"
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider border ${
+        isOfficial ? "border-white/25 text-white/75 bg-white/[0.06]" : "border-white/15 text-white/55 bg-white/[0.03]"
       }`}
     >
       {isOfficial ? "Official" : "Founding team"}
@@ -73,45 +84,39 @@ function RoleBadge({ role }: { role: VerifiedChannel["role"] }) {
   );
 }
 
-export function ChannelProfileCard({
-  channel,
-  compact = false,
-}: {
-  channel: VerifiedChannel;
-  compact?: boolean;
-}) {
+function ChannelProfileCard({ channel }: { channel: VerifiedChannel }) {
   const Icon = kindIcon(channel.kind);
   const external = channel.kind !== "email";
 
   return (
-    <motion.a
-      href={channel.url}
-      target={external ? "_blank" : undefined}
-      rel={external ? "noopener noreferrer" : undefined}
-      initial={{ opacity: 0, y: 12 }}
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`group block rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-4 transition-colors hover:border-emerald-500/30 hover:bg-white/[0.07] ${
-        compact ? "" : "md:p-5"
-      }`}
+      className="rounded-2xl border border-white/12 bg-black/40 backdrop-blur-md p-5 md:p-6"
     >
       <div className="flex items-start gap-4">
         <ChannelAvatar channel={channel} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <p className="font-semibold text-[15px] truncate">{channel.displayName}</p>
+            <p className="font-semibold text-[16px] truncate">{channel.displayName}</p>
             <RoleBadge role={channel.role} />
           </div>
-          <p className="text-[13px] text-emerald-400/90 font-medium truncate">{handleLabel(channel)}</p>
+          <p className="text-[13px] text-white/70 font-medium truncate">{handleLabel(channel)}</p>
           {channel.subtitle ? (
-            <p className="mt-2 text-[12px] text-white/45 leading-relaxed line-clamp-2">{channel.subtitle}</p>
+            <p className="mt-2 text-[13px] text-white/45 leading-relaxed">{channel.subtitle}</p>
           ) : null}
-          <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-white/35">
+          <a
+            href={channel.url}
+            target={external ? "_blank" : undefined}
+            rel={external ? "noopener noreferrer" : undefined}
+            className="mt-4 inline-flex items-center gap-1.5 text-[12px] text-white/50 hover:text-white transition-colors"
+          >
             <Icon className="h-3.5 w-3.5" />
-            <span className="group-hover:text-white/55 transition-colors">Verified channel</span>
-          </div>
+            Open verified channel
+          </a>
         </div>
       </div>
-    </motion.a>
+    </motion.div>
   );
 }
 
@@ -123,16 +128,16 @@ function VerifyResultPanel({ result }: { result: VerifyResult }) {
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl border border-red-500/25 bg-red-500/[0.06] p-5 md:p-6"
+        className="rounded-2xl border border-red-500/30 bg-red-950/20 backdrop-blur-md p-5 md:p-6"
       >
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15">
             <AlertTriangle className="h-5 w-5 text-red-300" />
           </div>
           <div>
-            <p className="font-semibold text-red-200">Not verified</p>
-            <p className="mt-1 text-[13px] text-white/55 leading-relaxed">{result.message}</p>
-            <p className="mt-3 text-[12px] text-white/35 font-mono break-all">Query: {result.query}</p>
+            <p className="font-semibold text-red-100">Not verified</p>
+            <p className="mt-1.5 text-[13px] text-white/55 leading-relaxed">{result.message}</p>
+            <p className="mt-3 text-[11px] text-white/30 font-mono break-all">{result.query}</p>
           </div>
         </div>
       </motion.div>
@@ -140,13 +145,49 @@ function VerifyResultPanel({ result }: { result: VerifyResult }) {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="mb-3 flex items-center gap-2 text-emerald-300">
-        <ShieldCheck className="h-5 w-5" />
-        <span className="text-[13px] font-semibold uppercase tracking-wider">Verified official channel</span>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+      <div className="flex items-center gap-2 text-white/80">
+        <ShieldCheck className="h-4 w-4" />
+        <span className="text-[12px] font-medium uppercase tracking-[0.14em]">Verified channel</span>
       </div>
       <ChannelProfileCard channel={result.channel} />
     </motion.div>
+  );
+}
+
+function VerifyWarningDialog({ open, onContinue }: { open: boolean; onContinue: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent
+        className="max-w-md border-white/12 bg-[#0a0a0a] text-white sm:rounded-2xl"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
+        <DialogHeader>
+          <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10">
+            <ShieldAlert className="h-5 w-5 text-amber-200" />
+          </div>
+          <DialogTitle className="text-center text-lg">Stay safe before you verify</DialogTitle>
+          <DialogDescription className="text-center text-white/45 text-[13px] leading-relaxed pt-1">
+            Read this carefully. Scammers impersonate crypto teams every day.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="space-y-3 text-[13px] text-white/60 leading-relaxed list-disc pl-4 marker:text-white/25">
+          {SAFETY_WARNINGS.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <DialogFooter className="sm:justify-center pt-2">
+          <Button
+            type="button"
+            className="w-full rounded-full bg-white text-black hover:bg-white/90 font-semibold h-11"
+            onClick={onContinue}
+          >
+            I understand, continue
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -154,17 +195,25 @@ export function VerifyPageContent() {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [result, setResult] = useState<VerifyResult | null>(null);
-  const [official, setOfficial] = useState<VerifiedChannel[]>([]);
-  const [foundingTeam, setFoundingTeam] = useState<VerifiedChannel[]>([]);
+  const [warningOpen, setWarningOpen] = useState(false);
 
   useEffect(() => {
-    fetchOfficialChannelLists()
-      .then(({ official: o, foundingTeam: f }) => {
-        setOfficial(o);
-        setFoundingTeam(f);
-      })
-      .catch(() => {});
+    try {
+      const seen = sessionStorage.getItem(VERIFY_WARNING_KEY);
+      if (!seen) setWarningOpen(true);
+    } catch {
+      setWarningOpen(true);
+    }
   }, []);
+
+  const dismissWarning = () => {
+    try {
+      sessionStorage.setItem(VERIFY_WARNING_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setWarningOpen(false);
+  };
 
   const runVerify = useCallback(async (value: string) => {
     const trimmed = value.trim();
@@ -180,7 +229,7 @@ export function VerifyPageContent() {
       setResult({
         verified: false,
         query: trimmed,
-        message: "Could not verify right now. Compare against the official list below.",
+        message: "Could not verify right now. Only trust channels that return verified on this page.",
       });
     } finally {
       setSearching(false);
@@ -193,82 +242,48 @@ export function VerifyPageContent() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-6 md:px-10 pb-16">
-      <section className="text-center mb-10 md:mb-12">
-        <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-5">
-          <ShieldCheck className="h-6 w-6 text-emerald-400" />
-        </div>
-        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+    <>
+      <VerifyWarningDialog open={warningOpen} onContinue={dismissWarning} />
+
+      <div className="w-full max-w-2xl mx-auto px-6 text-center">
+        <h1 className="text-[clamp(1.125rem,3.2vw,2rem)] font-semibold tracking-tight leading-tight whitespace-nowrap">
           Solid One Official Verification Channel
         </h1>
-        <p className="mt-3 text-[15px] text-white/50 leading-relaxed max-w-xl mx-auto">
-          Check whether a social media account, email, or domain is an official Solid One channel — protect
+        <p className="mt-4 text-[14px] md:text-[15px] text-white/45 leading-relaxed max-w-md mx-auto">
+          Check whether a social media account, email, or domain is an official Solid One channel. Protect
           yourself against phishing and fraud.
         </p>
-      </section>
 
-      <section className="mb-10">
-        <form onSubmit={onSubmit} className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/30 pointer-events-none" />
+        <form onSubmit={onSubmit} className="relative mt-8 md:mt-10 max-w-xl mx-auto">
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-white/25 pointer-events-none" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="X handle, Telegram @username, email, or domain…"
-            className="h-14 pl-12 pr-28 rounded-2xl border-white/12 bg-white/[0.04] text-[15px] placeholder:text-white/30 focus-visible:ring-emerald-500/40"
+            placeholder="X, Telegram, email, or domain"
+            className="h-[60px] md:h-[64px] pl-12 pr-[6.5rem] rounded-full border-white/10 bg-white/[0.04] text-[15px] md:text-[16px] placeholder:text-white/28 focus-visible:ring-white/20 focus-visible:border-white/20"
           />
           <Button
             type="submit"
-            disabled={searching || !query.trim()}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-semibold h-10 px-5"
+            disabled={searching || !query.trim() || warningOpen}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white text-black hover:bg-white/90 font-semibold h-11 md:h-12 px-6 text-[14px]"
           >
-            {searching ? "Checking…" : "Verify"}
+            {searching ? "…" : "Verify"}
           </Button>
         </form>
-        <p className="mt-3 text-[12px] text-white/35 text-center">
-          Try{" "}
-          <button type="button" className="text-emerald-400/80 hover:text-emerald-300 underline-offset-2 hover:underline" onClick={() => { setQuery("@solidone_co"); void runVerify("@solidone_co"); }}>
-            @solidone_co
-          </button>
-          ,{" "}
-          <button type="button" className="text-emerald-400/80 hover:text-emerald-300 underline-offset-2 hover:underline" onClick={() => { setQuery("operations@solidone.io"); void runVerify("operations@solidone.io"); }}>
-            operations@solidone.io
-          </button>
-          , or{" "}
-          <button type="button" className="text-emerald-400/80 hover:text-emerald-300 underline-offset-2 hover:underline" onClick={() => { setQuery("@Soubhagyaweb3"); void runVerify("@Soubhagyaweb3"); }}>
-            @Soubhagyaweb3
-          </button>
-        </p>
-      </section>
 
-      <AnimatePresence mode="wait">
-        {result ? (
-          <motion.section key={result.query + String(result.verified)} className="mb-12" layout>
-            <VerifyResultPanel result={result} />
-          </motion.section>
-        ) : null}
-      </AnimatePresence>
-
-      <section className="mb-12">
-        <h2 className="text-lg font-semibold mb-1">Official channels</h2>
-        <p className="text-[13px] text-white/45 mb-5">Company accounts, email, website, and community group.</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {official.map((channel) => (
-            <ChannelProfileCard key={channel.id} channel={channel} />
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold mb-1">Founding team</h2>
-        <p className="text-[13px] text-white/45 mb-5">
-          Verified founding team members on X and Telegram. Always cross-check here before trusting DMs.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {foundingTeam.map((channel) => (
-            <ChannelProfileCard key={channel.id} channel={channel} />
-          ))}
-        </div>
-      </section>
-    </div>
+        <AnimatePresence mode="wait">
+          {result ? (
+            <motion.div
+              key={result.query + String(result.verified)}
+              className="mt-8 text-left"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <VerifyResultPanel result={result} />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+    </>
   );
 }
