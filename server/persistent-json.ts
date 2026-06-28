@@ -2,12 +2,21 @@ import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { isVercelRuntime } from "./runtime.js";
+import {
+  readMongoJson,
+  saveMongoImage,
+  useMongoStorage,
+  writeMongoJson,
+} from "./mongo-store.js";
+
+export { useMongoStorage } from "./mongo-store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(__dirname, "..", "data");
 
 /** Blob SDK auth: BLOB_READ_WRITE_TOKEN, or on Vercel OIDC via BLOB_STORE_ID. */
 export function useBlobStorage(): boolean {
+  if (useMongoStorage()) return false;
   if (process.env.BLOB_READ_WRITE_TOKEN) return true;
   return isVercelRuntime() && Boolean(process.env.BLOB_STORE_ID);
 }
@@ -20,7 +29,7 @@ export function blobAccess(): "public" | "private" {
 
 /** Local dev only — Vercel serverless has a read-only project filesystem. */
 function ensureLocalDataDir(): void {
-  if (useBlobStorage() || isVercelRuntime()) return;
+  if (useMongoStorage() || useBlobStorage() || isVercelRuntime()) return;
   try {
     mkdirSync(dataDir, { recursive: true });
   } catch {
@@ -59,6 +68,9 @@ async function readBlobJson<T>(filename: string, fallback: T): Promise<T> {
 }
 
 export async function readJsonFile<T>(filename: string, fallback: T): Promise<T> {
+  if (useMongoStorage()) {
+    return readMongoJson(filename, fallback);
+  }
   if (!useBlobStorage()) {
     try {
       const raw = readFileSync(path.join(dataDir, filename), "utf8");
@@ -73,9 +85,15 @@ export async function readJsonFile<T>(filename: string, fallback: T): Promise<T>
 
 export async function writeJsonFile<T>(filename: string, data: T): Promise<void> {
   const body = JSON.stringify(data, null, 2);
+  if (useMongoStorage()) {
+    await writeMongoJson(filename, data);
+    return;
+  }
   if (!useBlobStorage()) {
     if (isVercelRuntime()) {
-      throw new Error("Blob storage is required on Vercel to save website data.");
+      throw new Error(
+        "Set MONGODB_URI on Vercel to save website data (same cluster as auth-api).",
+      );
     }
     ensureLocalDataDir();
     writeFileSync(path.join(dataDir, filename), body, "utf8");
@@ -96,6 +114,18 @@ export async function saveUploadedImage(
   filename: string,
   uploadsDir: string,
 ): Promise<string> {
+  if (useMongoStorage()) {
+    const ext = path.extname(filename).toLowerCase();
+    const contentType =
+      ext === ".png"
+        ? "image/png"
+        : ext === ".webp"
+          ? "image/webp"
+          : ext === ".gif"
+            ? "image/gif"
+            : "image/jpeg";
+    return saveMongoImage(buffer, filename, contentType);
+  }
   if (!useBlobStorage()) {
     mkdirSync(uploadsDir, { recursive: true });
     const dest = path.join(uploadsDir, filename);
@@ -112,4 +142,11 @@ export async function saveUploadedImage(
     contentType,
   });
   return blob.url;
+}
+
+export function storageBackendLabel(): "mongo" | "blob" | "local" | "none" {
+  if (useMongoStorage()) return "mongo";
+  if (useBlobStorage()) return "blob";
+  if (isVercelRuntime()) return "none";
+  return "local";
 }

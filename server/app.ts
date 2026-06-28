@@ -24,7 +24,8 @@ import { registerBlogRoutes } from "./register-blog-routes.js";
 import { registerDownloadRoutes } from "./register-download-routes.js";
 import { registerVerifyRoutes } from "./register-verify-routes.js";
 import { asyncRoute } from "./async-route.js";
-import { useBlobStorage } from "./persistent-json.js";
+import { storageBackendLabel, useBlobStorage, useMongoStorage } from "./persistent-json.js";
+import { readMongoImage, ensureMongoIndexes } from "./mongo-store.js";
 import { isVercelRuntime } from "./runtime.js";
 import {
   handleAdminInstallsList,
@@ -39,7 +40,9 @@ export function createApp() {
   const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD ?? "solidone-admin").trim();
   const dataDir = path.resolve(__dirname, "..", "data");
   const uploadsDir = path.join(dataDir, "uploads");
-  if (!useBlobStorage() && !isVercelRuntime()) {
+  void ensureMongoIndexes();
+
+  if (!useMongoStorage() && !useBlobStorage() && !isVercelRuntime()) {
     try {
       mkdirSync(uploadsDir, { recursive: true });
     } catch {
@@ -63,9 +66,28 @@ export function createApp() {
   app.get("/api/health", (_req, res) => {
     res.json({
       ok: true,
-      storage: useBlobStorage() ? "blob" : isVercelRuntime() ? "none" : "local",
+      storage: storageBackendLabel(),
     });
   });
+
+  app.get(
+    "/api/uploads/:filename",
+    asyncRoute(async (req, res) => {
+      const filename = path.basename(String(req.params.filename || ""));
+      if (!filename || !useMongoStorage()) {
+        res.status(404).json({ error: "Not found." });
+        return;
+      }
+      const file = await readMongoImage(filename);
+      if (!file) {
+        res.status(404).json({ error: "Not found." });
+        return;
+      }
+      res.setHeader("Content-Type", file.contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.send(file.buffer);
+    }),
+  );
 
   app.post(
     "/api/subscribe",
@@ -163,7 +185,7 @@ export function createApp() {
     }),
   );
 
-  if (!useBlobStorage()) {
+  if (!useMongoStorage() && !useBlobStorage()) {
     app.use("/uploads", express.static(uploadsDir));
   }
 

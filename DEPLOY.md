@@ -10,8 +10,9 @@ Repository: https://github.com/solidone-io/Solid-One-Website.git
 4. **Framework Preset:** **Other**.
 5. Environment variables:
    - `ADMIN_PASSWORD`
-   - `BLOB_READ_WRITE_TOKEN` (Storage → Blob → Connect)
-6. **Deploy**.
+   - `MONGODB_URI` — same connection string as auth-api on Railway
+   - `MONGODB_DB` — usually `solidone`
+6. **Deploy** (Blob is optional; Mongo replaces it).
 
 ## Local dev
 

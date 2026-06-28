@@ -18,10 +18,99 @@ function isVercelRuntime() {
   return Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
 }
 
+// server/mongo-store.ts
+import { Binary, MongoClient } from "mongodb";
+var JSON_COLLECTION = "website_json";
+var UPLOADS_COLLECTION = "website_uploads";
+var clientPromise = null;
+function mongoUri() {
+  return process.env.MONGODB_URI_STANDARD?.trim() || process.env.MONGODB_URI?.trim() || "";
+}
+function useMongoStorage() {
+  return Boolean(mongoUri());
+}
+function dbName() {
+  return process.env.MONGODB_DB?.trim() || "solidone";
+}
+async function getClient() {
+  const uri = mongoUri();
+  if (!uri) throw new Error("MONGODB_URI is not configured.");
+  if (!clientPromise) {
+    clientPromise = MongoClient.connect(uri, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 2e4
+    });
+  }
+  return clientPromise;
+}
+async function jsonCol() {
+  const client = await getClient();
+  return client.db(dbName()).collection(JSON_COLLECTION);
+}
+async function uploadsCol() {
+  const client = await getClient();
+  return client.db(dbName()).collection(UPLOADS_COLLECTION);
+}
+async function readMongoJson(filename, fallback) {
+  try {
+    const col = await jsonCol();
+    const doc = await col.findOne({ _id: filename });
+    if (!doc || doc.data === void 0) return fallback;
+    return doc.data;
+  } catch (err) {
+    console.error("readMongoJson", filename, err);
+    return fallback;
+  }
+}
+async function writeMongoJson(filename, data) {
+  const col = await jsonCol();
+  await col.updateOne(
+    { _id: filename },
+    { $set: { data, updatedAt: /* @__PURE__ */ new Date() } },
+    { upsert: true }
+  );
+}
+async function saveMongoImage(buffer, filename, contentType) {
+  const col = await uploadsCol();
+  await col.updateOne(
+    { _id: filename },
+    {
+      $set: {
+        data: new Binary(buffer),
+        contentType,
+        updatedAt: /* @__PURE__ */ new Date()
+      }
+    },
+    { upsert: true }
+  );
+  return `/api/uploads/${encodeURIComponent(filename)}`;
+}
+async function readMongoImage(filename) {
+  const col = await uploadsCol();
+  const doc = await col.findOne({ _id: filename });
+  if (!doc?.data) return null;
+  const raw = doc.data;
+  const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw.buffer);
+  const contentType = typeof doc.contentType === "string" ? doc.contentType : "application/octet-stream";
+  return { buffer, contentType };
+}
+async function ensureMongoIndexes() {
+  if (!useMongoStorage()) return;
+  try {
+    const col = await jsonCol();
+    await col.createIndex({ updatedAt: -1 });
+    const uploads = await uploadsCol();
+    await uploads.createIndex({ updatedAt: -1 });
+  } catch (err) {
+    console.error("ensureMongoIndexes", err);
+  }
+}
+
 // server/persistent-json.ts
 var __dirname = path.dirname(fileURLToPath(import.meta.url));
 var dataDir = path.resolve(__dirname, "..", "data");
 function useBlobStorage() {
+  if (useMongoStorage()) return false;
   if (process.env.BLOB_READ_WRITE_TOKEN) return true;
   return isVercelRuntime() && Boolean(process.env.BLOB_STORE_ID);
 }
@@ -30,7 +119,7 @@ function blobAccess() {
   return mode === "public" ? "public" : "private";
 }
 function ensureLocalDataDir() {
-  if (useBlobStorage() || isVercelRuntime()) return;
+  if (useMongoStorage() || useBlobStorage() || isVercelRuntime()) return;
   try {
     mkdirSync(dataDir, { recursive: true });
   } catch {
@@ -62,6 +151,9 @@ async function readBlobJson(filename, fallback) {
   }
 }
 async function readJsonFile(filename, fallback) {
+  if (useMongoStorage()) {
+    return readMongoJson(filename, fallback);
+  }
   if (!useBlobStorage()) {
     try {
       const raw = readFileSync(path.join(dataDir, filename), "utf8");
@@ -74,9 +166,15 @@ async function readJsonFile(filename, fallback) {
 }
 async function writeJsonFile(filename, data) {
   const body = JSON.stringify(data, null, 2);
+  if (useMongoStorage()) {
+    await writeMongoJson(filename, data);
+    return;
+  }
   if (!useBlobStorage()) {
     if (isVercelRuntime()) {
-      throw new Error("Blob storage is required on Vercel to save website data.");
+      throw new Error(
+        "Set MONGODB_URI on Vercel to save website data (same cluster as auth-api)."
+      );
     }
     ensureLocalDataDir();
     writeFileSync(path.join(dataDir, filename), body, "utf8");
@@ -91,6 +189,11 @@ async function writeJsonFile(filename, data) {
   });
 }
 async function saveUploadedImage(buffer, filename, uploadsDir) {
+  if (useMongoStorage()) {
+    const ext2 = path.extname(filename).toLowerCase();
+    const contentType2 = ext2 === ".png" ? "image/png" : ext2 === ".webp" ? "image/webp" : ext2 === ".gif" ? "image/gif" : "image/jpeg";
+    return saveMongoImage(buffer, filename, contentType2);
+  }
   if (!useBlobStorage()) {
     mkdirSync(uploadsDir, { recursive: true });
     const dest = path.join(uploadsDir, filename);
@@ -105,6 +208,12 @@ async function saveUploadedImage(buffer, filename, uploadsDir) {
     contentType
   });
   return blob.url;
+}
+function storageBackendLabel() {
+  if (useMongoStorage()) return "mongo";
+  if (useBlobStorage()) return "blob";
+  if (isVercelRuntime()) return "none";
+  return "local";
 }
 
 // server/store-notify-store.ts
@@ -490,7 +599,7 @@ function postValidationError(error) {
 }
 function registerBlogRoutes(app2, { requireAdmin, uploadsDir }) {
   const upload = multer({
-    storage: useBlobStorage() || isVercelRuntime() ? multer.memoryStorage() : multer.diskStorage({
+    storage: useMongoStorage() || useBlobStorage() || isVercelRuntime() ? multer.memoryStorage() : multer.diskStorage({
       destination: uploadsDir,
       filename: (_req, file, cb) => {
         const ext = path2.extname(file.originalname).toLowerCase() || ".jpg";
@@ -562,7 +671,7 @@ function registerBlogRoutes(app2, { requireAdmin, uploadsDir }) {
         }
         const ext = path2.extname(req.file.originalname).toLowerCase() || ".jpg";
         const filename = `${Date.now()}-${randomUUID()}${ext}`;
-        const url = useBlobStorage() ? await saveUploadedImage(req.file.buffer, filename, uploadsDir) : `/uploads/${req.file.filename}`;
+        const url = useMongoStorage() || useBlobStorage() ? await saveUploadedImage(req.file.buffer, filename, uploadsDir) : `/uploads/${req.file.filename}`;
         res.json({ ok: true, url });
       })().catch((e) => {
         res.status(500).json({ error: e instanceof Error ? e.message : "Upload failed." });
@@ -1745,7 +1854,8 @@ function createApp() {
   const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD ?? "solidone-admin").trim();
   const dataDir2 = path4.resolve(__dirname3, "..", "data");
   const uploadsDir = path4.join(dataDir2, "uploads");
-  if (!useBlobStorage() && !isVercelRuntime()) {
+  void ensureMongoIndexes();
+  if (!useMongoStorage() && !useBlobStorage() && !isVercelRuntime()) {
     try {
       mkdirSync2(uploadsDir, { recursive: true });
     } catch {
@@ -1764,9 +1874,27 @@ function createApp() {
   app2.get("/api/health", (_req, res) => {
     res.json({
       ok: true,
-      storage: useBlobStorage() ? "blob" : isVercelRuntime() ? "none" : "local"
+      storage: storageBackendLabel()
     });
   });
+  app2.get(
+    "/api/uploads/:filename",
+    asyncRoute(async (req, res) => {
+      const filename = path4.basename(String(req.params.filename || ""));
+      if (!filename || !useMongoStorage()) {
+        res.status(404).json({ error: "Not found." });
+        return;
+      }
+      const file = await readMongoImage(filename);
+      if (!file) {
+        res.status(404).json({ error: "Not found." });
+        return;
+      }
+      res.setHeader("Content-Type", file.contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.send(file.buffer);
+    })
+  );
   app2.post(
     "/api/subscribe",
     asyncRoute(async (req, res) => {
@@ -1852,7 +1980,7 @@ function createApp() {
       res.status(status).json(json);
     })
   );
-  if (!useBlobStorage()) {
+  if (!useMongoStorage() && !useBlobStorage()) {
     app2.use("/uploads", express.static(uploadsDir));
   }
   registerBlogRoutes(app2, { requireAdmin, uploadsDir });

@@ -15,7 +15,7 @@ import {
   updateBlogPost,
 } from "./blog-store.js";
 import { serializePost, slugify, uniqueSlug } from "./blog-utils.js";
-import { saveUploadedImage, useBlobStorage } from "./persistent-json.js";
+import { saveUploadedImage, useBlobStorage, useMongoStorage } from "./persistent-json.js";
 import { isVercelRuntime } from "./runtime.js";
 
 function htmlHasText(html: string): boolean {
@@ -55,7 +55,7 @@ type RegisterOptions = {
 
 export function registerBlogRoutes(app: express.Express, { requireAdmin, uploadsDir }: RegisterOptions) {
   const upload = multer({
-    storage: useBlobStorage() || isVercelRuntime()
+    storage: useMongoStorage() || useBlobStorage() || isVercelRuntime()
       ? multer.memoryStorage()
       : multer.diskStorage({
           destination: uploadsDir,
@@ -134,9 +134,10 @@ export function registerBlogRoutes(app: express.Express, { requireAdmin, uploads
         }
         const ext = path.extname(req.file.originalname).toLowerCase() || ".jpg";
         const filename = `${Date.now()}-${randomUUID()}${ext}`;
-        const url = useBlobStorage()
-          ? await saveUploadedImage(req.file.buffer, filename, uploadsDir)
-          : `/uploads/${req.file.filename}`;
+        const url =
+          useMongoStorage() || useBlobStorage()
+            ? await saveUploadedImage(req.file.buffer, filename, uploadsDir)
+            : `/uploads/${req.file.filename}`;
         res.json({ ok: true, url });
       })().catch((e) => {
         res.status(500).json({ error: e instanceof Error ? e.message : "Upload failed." });
