@@ -44,7 +44,10 @@ export function registerDownloadRoutes(app: express.Express) {
     "/api/download/reviews",
     asyncRoute(async (req, res) => {
       const query = req.query as Record<string, string | string[] | undefined>;
-      const { status, json } = await handleDownloadReviewsGet(query);
+      const { status, json } = await handleDownloadReviewsGet(
+        query,
+        sessionFromAuthHeader(req.headers.authorization),
+      );
       res.status(status).json(json);
     }),
   );

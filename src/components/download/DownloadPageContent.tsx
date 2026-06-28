@@ -867,11 +867,11 @@ export function DownloadPageContent() {
         </AnimatePresence>
       </section>
 
-      {/* Recent reviews */}
+      {/* Recent feedback */}
       <section className="py-4">
-        <h3 className="font-medium mb-2">Recent ratings</h3>
+        <h3 className="font-medium mb-2">Recent feedback</h3>
         {reviews.length === 0 ? (
-          <p className="text-[14px] text-white/40 py-6">No reviews yet. Be the first to rate Solid One.</p>
+          <p className="text-[14px] text-white/40 py-6">No feedback yet. Be the first to share your experience.</p>
         ) : (
           reviews.map((r) => (
             <ReviewCard
@@ -910,7 +910,7 @@ export function DownloadPageContent() {
             className="w-full mt-4 rounded-full border-white/15 bg-transparent hover:bg-white/5"
             onClick={() => setAllReviewsOpen(true)}
           >
-            View all {reviewTotal} reviews
+            View all {reviewTotal} feedback
           </Button>
         )}
       </section>
@@ -959,7 +959,7 @@ export function DownloadPageContent() {
           </div>
 
           <label className="block text-[13px] text-white/50 mb-1.5 mt-0.5">
-            Describe your experience (optional)
+            Describe your experience (required)
           </label>
           <textarea
             className="w-full min-h-[100px] rounded-lg border border-white/12 bg-white/5 px-3 py-2 text-[14px] resize-none focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
@@ -983,7 +983,7 @@ export function DownloadPageContent() {
 
           <Button
             className="w-full mt-4 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold"
-            disabled={draftStars < 1 || !ratingAgreed || posting}
+            disabled={draftStars < 1 || !ratingText.trim() || !ratingAgreed || posting}
             onClick={handlePostReview}
           >
             {posting ? "Posting…" : "Post"}
@@ -999,7 +999,7 @@ export function DownloadPageContent() {
               <img src={DOWNLOAD_APP.icon} alt="" className="h-9 w-9 rounded-lg" />
               <div>
                 <DialogTitle>{DOWNLOAD_APP.name}</DialogTitle>
-                <p className="text-[12px] text-white/45">Ratings and reviews</p>
+                <p className="text-[12px] text-white/45">Feedback and ratings</p>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
@@ -1007,7 +1007,7 @@ export function DownloadPageContent() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/35" />
                 <input
                   className="w-full h-10 pl-9 pr-3 rounded-full bg-white/5 border border-white/10 text-[13px]"
-                  placeholder="Search reviews"
+                  placeholder="Search feedback"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -1046,7 +1046,7 @@ export function DownloadPageContent() {
               />
             ))}
             {modalReviews.length === 0 && (
-              <p className="text-center text-white/40 py-8">No reviews match your filters.</p>
+              <p className="text-center text-white/40 py-8">No feedback matches your filters.</p>
             )}
           </div>
           <p className="text-[11px] text-white/35 text-center py-2 shrink-0">

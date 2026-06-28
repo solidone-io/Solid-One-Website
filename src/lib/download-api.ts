@@ -143,7 +143,8 @@ export async function fetchDownloadReviews(params: {
   if (params.offset != null) q.set("offset", String(params.offset));
   if (params.filter && params.filter !== "all") q.set("filter", params.filter);
   if (params.search?.trim()) q.set("search", params.search.trim());
-  return api(`/api/download/reviews?${q}`);
+  const token = getDownloadAuthToken();
+  return api(`/api/download/reviews?${q}`, token ? { auth: true } : {});
 }
 
 export async function postDownloadReview(stars: number, text: string): Promise<{

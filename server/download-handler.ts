@@ -255,6 +255,7 @@ export async function handleDownloadMyReviewDelete(
 
 export async function handleDownloadReviewsGet(
   query: Record<string, string | string[] | undefined>,
+  session: DownloadSession | null = null,
 ): Promise<{ status: number; json: Record<string, unknown> }> {
   const limit = Math.min(50, Math.max(1, Number(query.limit) || 5));
   const offset = Math.max(0, Number(query.offset) || 0);
@@ -265,7 +266,13 @@ export async function handleDownloadReviewsGet(
       : "all";
   const search = typeof query.search === "string" ? query.search : undefined;
 
-  const { reviews, total } = await listReviews({ limit, offset, filter, search });
+  const { reviews, total } = await listReviews({
+    limit,
+    offset,
+    filter,
+    search,
+    viewerGoogleSub: session?.sub,
+  });
   const stats = await getDownloadStats();
   return {
     status: 200,
@@ -286,7 +293,7 @@ export async function handleDownloadReviewPost(
   const parsed = z
     .object({
       stars: z.number().int().min(1).max(5),
-      text: z.string().max(500).optional().default(""),
+      text: z.string().trim().min(1, "Feedback text is required.").max(500),
     })
     .safeParse(body);
   if (!parsed.success) {

@@ -808,6 +808,19 @@ function enrichInstallsFromReviews(installs, reviews) {
 async function writeStore(data) {
   await writeJsonFile(FILE5, data);
 }
+function hasFeedbackText(text) {
+  return text.trim().length > 0;
+}
+function sortReviewsForViewer(rows, viewerGoogleSub) {
+  const sorted = [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (!viewerGoogleSub) return sorted;
+  return sorted.sort((a, b) => {
+    const aOwn = a.googleSub === viewerGoogleSub ? 1 : 0;
+    const bOwn = b.googleSub === viewerGoogleSub ? 1 : 0;
+    if (aOwn !== bOwn) return bOwn - aOwn;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+}
 function computeStats(reviews, installCount) {
   const visible = reviews.filter((r) => !r.flagged);
   const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -898,7 +911,7 @@ async function addReview(input) {
 }
 async function listReviews(options) {
   const store = await readStore();
-  let rows = store.reviews.filter((r) => !r.flagged);
+  let rows = store.reviews.filter((r) => !r.flagged && hasFeedbackText(r.text));
   const q = options.search?.trim().toLowerCase();
   if (q) {
     rows = rows.filter(
@@ -908,6 +921,7 @@ async function listReviews(options) {
   if (options.filter === "positive") rows = rows.filter((r) => r.stars >= 4);
   else if (options.filter === "negative") rows = rows.filter((r) => r.stars <= 2);
   else if (options.filter === "neutral") rows = rows.filter((r) => r.stars === 3);
+  rows = sortReviewsForViewer(rows, options.viewerGoogleSub);
   const total = rows.length;
   const reviews = rows.slice(options.offset, options.offset + options.limit);
   return { reviews, total };
@@ -1217,13 +1231,19 @@ async function handleDownloadMyReviewDelete(session) {
     };
   }
 }
-async function handleDownloadReviewsGet(query) {
+async function handleDownloadReviewsGet(query, session = null) {
   const limit = Math.min(50, Math.max(1, Number(query.limit) || 5));
   const offset = Math.max(0, Number(query.offset) || 0);
   const filterRaw = typeof query.filter === "string" ? query.filter : "all";
   const filter = filterRaw === "positive" || filterRaw === "negative" || filterRaw === "neutral" ? filterRaw : "all";
   const search = typeof query.search === "string" ? query.search : void 0;
-  const { reviews, total } = await listReviews({ limit, offset, filter, search });
+  const { reviews, total } = await listReviews({
+    limit,
+    offset,
+    filter,
+    search,
+    viewerGoogleSub: session?.sub
+  });
   const stats = await getDownloadStats();
   return {
     status: 200,
@@ -1239,7 +1259,7 @@ async function handleDownloadReviewPost(session, body) {
   if (!session) return { status: 401, json: { error: "Sign in required." } };
   const parsed = z5.object({
     stars: z5.number().int().min(1).max(5),
-    text: z5.string().max(500).optional().default("")
+    text: z5.string().trim().min(1, "Feedback text is required.").max(500)
   }).safeParse(body);
   if (!parsed.success) {
     return { status: 400, json: { error: validationError2(parsed.error) } };
@@ -1355,7 +1375,10 @@ function registerDownloadRoutes(app2) {
     "/api/download/reviews",
     asyncRoute(async (req, res) => {
       const query = req.query;
-      const { status, json } = await handleDownloadReviewsGet(query);
+      const { status, json } = await handleDownloadReviewsGet(
+        query,
+        sessionFromAuthHeader(req.headers.authorization)
+      );
       res.status(status).json(json);
     })
   );

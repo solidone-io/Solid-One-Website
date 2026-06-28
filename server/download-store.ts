@@ -142,6 +142,24 @@ export type DownloadStats = {
   distribution: Record<1 | 2 | 3 | 4 | 5, number>;
 };
 
+export function hasFeedbackText(text: string): boolean {
+  return text.trim().length > 0;
+}
+
+function sortReviewsForViewer(
+  rows: DownloadReviewRecord[],
+  viewerGoogleSub?: string,
+): DownloadReviewRecord[] {
+  const sorted = [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (!viewerGoogleSub) return sorted;
+  return sorted.sort((a, b) => {
+    const aOwn = a.googleSub === viewerGoogleSub ? 1 : 0;
+    const bOwn = b.googleSub === viewerGoogleSub ? 1 : 0;
+    if (aOwn !== bOwn) return bOwn - aOwn;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+}
+
 export function computeStats(reviews: DownloadReviewRecord[], installCount: number): DownloadStats {
   const visible = reviews.filter((r) => !r.flagged);
   const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<1 | 2 | 3 | 4 | 5, number>;
@@ -258,9 +276,11 @@ export async function listReviews(options: {
   offset: number;
   filter?: "all" | "positive" | "negative" | "neutral";
   search?: string;
+  /** When set, the viewer's written feedback is pinned first; everyone else is newest-first. */
+  viewerGoogleSub?: string;
 }): Promise<{ reviews: DownloadReviewRecord[]; total: number }> {
   const store = await readStore();
-  let rows = store.reviews.filter((r) => !r.flagged);
+  let rows = store.reviews.filter((r) => !r.flagged && hasFeedbackText(r.text));
 
   const q = options.search?.trim().toLowerCase();
   if (q) {
@@ -275,6 +295,8 @@ export async function listReviews(options: {
   if (options.filter === "positive") rows = rows.filter((r) => r.stars >= 4);
   else if (options.filter === "negative") rows = rows.filter((r) => r.stars <= 2);
   else if (options.filter === "neutral") rows = rows.filter((r) => r.stars === 3);
+
+  rows = sortReviewsForViewer(rows, options.viewerGoogleSub);
 
   const total = rows.length;
   const reviews = rows.slice(options.offset, options.offset + options.limit);
