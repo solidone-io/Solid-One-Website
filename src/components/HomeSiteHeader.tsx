@@ -75,6 +75,9 @@ export function HomeSiteHeader({ solid = true }: HomeSiteHeaderProps) {
             <Link href="/support" className="hover:text-white transition-colors">
               Support
             </Link>
+            <Link href="/verify" className="hover:text-white transition-colors">
+              Verify
+            </Link>
             <Link href="/download" className="hover:text-white transition-colors text-white/80">
               Download
             </Link>

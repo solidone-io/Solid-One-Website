@@ -11,6 +11,7 @@ const MENU_SECTIONS = [
       { label: "About", href: "/about" },
       { label: "Blog", href: "/blog" },
       { label: "Support", href: "/support" },
+      { label: "Verify channels", href: "/verify" },
       { label: "Careers", href: "/careers" },
       { label: "Press", href: "/press" },
     ],

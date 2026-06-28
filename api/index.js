@@ -1442,6 +1442,303 @@ function registerDownloadRoutes(app2) {
   );
 }
 
+// server/official-channels.ts
+function xAvatar(handle) {
+  return `https://unavatar.io/x/${encodeURIComponent(handle)}`;
+}
+function tgAvatar(username) {
+  return `https://unavatar.io/telegram/${encodeURIComponent(username)}`;
+}
+var OFFICIAL_CHANNELS = [
+  {
+    id: "x-solidone",
+    kind: "x",
+    role: "official",
+    displayName: "Solid One",
+    handle: "solidone_co",
+    url: "https://x.com/solidone_co",
+    subtitle: "Official X account",
+    avatarUrl: xAvatar("solidone_co"),
+    aliases: [
+      "solidone_co",
+      "@solidone_co",
+      "x.com/solidone_co",
+      "twitter.com/solidone_co",
+      "https://x.com/solidone_co",
+      "https://twitter.com/solidone_co"
+    ]
+  },
+  {
+    id: "email-operations",
+    kind: "email",
+    role: "official",
+    displayName: "Solid One Operations",
+    handle: "operations@solidone.io",
+    url: "mailto:operations@solidone.io",
+    subtitle: "Official support & operations email",
+    aliases: [
+      "operations@solidone.io",
+      "mailto:operations@solidone.io",
+      "operations"
+    ]
+  },
+  {
+    id: "domain-solidone",
+    kind: "domain",
+    role: "official",
+    displayName: "solidone.io",
+    handle: "solidone.io",
+    url: "https://solidone.io",
+    subtitle: "Official website & app download",
+    aliases: [
+      "solidone.io",
+      "www.solidone.io",
+      "https://solidone.io",
+      "https://www.solidone.io",
+      "api.solidone.io",
+      "https://api.solidone.io"
+    ]
+  },
+  {
+    id: "telegram-community",
+    kind: "telegram",
+    role: "official",
+    displayName: "Solid One Community",
+    handle: "Solid One Telegram",
+    url: "https://t.me/+U3mdhWkbNcFmYTI8",
+    subtitle: "Official Telegram community group",
+    aliases: [
+      "t.me/+u3mdhwkbncfmyti8",
+      "https://t.me/+u3mdhwkbncfmyti8",
+      "+u3mdhwkbncfmyti8",
+      "solid one telegram",
+      "solidone telegram",
+      "telegram group"
+    ]
+  },
+  {
+    id: "x-soubhagya",
+    kind: "x",
+    role: "founding-team",
+    displayName: "Soubhagya",
+    handle: "soubhagya_earth",
+    url: "https://x.com/soubhagya_earth",
+    subtitle: "Founding team \xB7 Driving web3 adoption with Solana",
+    avatarUrl: xAvatar("soubhagya_earth"),
+    aliases: [
+      "soubhagya_earth",
+      "@soubhagya_earth",
+      "x.com/soubhagya_earth",
+      "https://x.com/soubhagya_earth",
+      "soubhagya"
+    ]
+  },
+  {
+    id: "tg-soubhagya",
+    kind: "telegram",
+    role: "founding-team",
+    displayName: "Soubhagya",
+    handle: "Soubhagyaweb3",
+    url: "https://t.me/Soubhagyaweb3",
+    subtitle: "Founding team \xB7 Telegram",
+    avatarUrl: tgAvatar("Soubhagyaweb3"),
+    aliases: [
+      "soubhagyaweb3",
+      "@soubhagyaweb3",
+      "t.me/soubhagyaweb3",
+      "https://t.me/soubhagyaweb3"
+    ]
+  },
+  {
+    id: "tg-ashutosh",
+    kind: "telegram",
+    role: "founding-team",
+    displayName: "Ashutosh",
+    handle: "Ashutoshweb3",
+    url: "https://t.me/Ashutoshweb3",
+    subtitle: "Founding team \xB7 Telegram",
+    avatarUrl: tgAvatar("Ashutoshweb3"),
+    aliases: [
+      "ashutoshweb3",
+      "@ashutoshweb3",
+      "t.me/ashutoshweb3",
+      "https://t.me/ashutoshweb3",
+      "ashutosh"
+    ]
+  },
+  {
+    id: "tg-gourishankar",
+    kind: "telegram",
+    role: "founding-team",
+    displayName: "Gourishankar",
+    handle: "Gourishankar_web3",
+    url: "https://t.me/Gourishankar_web3",
+    subtitle: "Founding team \xB7 Telegram",
+    avatarUrl: tgAvatar("Gourishankar_web3"),
+    aliases: [
+      "gourishankar_web3",
+      "@gourishankar_web3",
+      "t.me/gourishankar_web3",
+      "https://t.me/gourishankar_web3",
+      "gourishankar"
+    ]
+  }
+];
+function normalizeVerifyQuery(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+  const candidates = /* @__PURE__ */ new Set();
+  const lower = trimmed.toLowerCase();
+  candidates.add(lower);
+  candidates.add(lower.replace(/^@/, ""));
+  if (lower.startsWith("mailto:")) {
+    candidates.add(lower.slice(7));
+  }
+  try {
+    const withProto = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const url = new URL(withProto);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    candidates.add(host);
+    candidates.add(`${host}${url.pathname === "/" ? "" : url.pathname.toLowerCase()}`);
+    if (host === "x.com" || host === "twitter.com") {
+      const seg = url.pathname.split("/").filter(Boolean);
+      const handle = seg[0] === "i" ? seg[1] : seg[0];
+      if (handle) {
+        candidates.add(handle.toLowerCase());
+        candidates.add(`@${handle.toLowerCase()}`);
+      }
+    }
+    if (host === "t.me" || host === "telegram.me") {
+      const path5 = url.pathname.replace(/^\//, "").toLowerCase();
+      if (path5) {
+        candidates.add(path5);
+        candidates.add(`t.me/${path5}`);
+        candidates.add(`https://t.me/${path5}`);
+        if (!path5.startsWith("+")) {
+          candidates.add(path5.replace(/^@/, ""));
+        }
+      }
+    }
+  } catch {
+  }
+  return [...candidates].filter(Boolean);
+}
+function lookupOfficialChannel(query) {
+  const keys = normalizeVerifyQuery(query);
+  if (!keys.length) return null;
+  for (const channel of OFFICIAL_CHANNELS) {
+    const aliasSet = new Set(
+      channel.aliases.flatMap((a) => normalizeVerifyQuery(a).map((k) => k.toLowerCase()))
+    );
+    aliasSet.add(channel.handle.toLowerCase());
+    aliasSet.add(channel.id.toLowerCase());
+    if (channel.kind === "x") {
+      aliasSet.add(`@${channel.handle.toLowerCase()}`);
+    }
+    for (const key of keys) {
+      if (aliasSet.has(key.toLowerCase())) return channel;
+    }
+  }
+  return null;
+}
+function serializeChannel(channel, extras) {
+  return {
+    id: channel.id,
+    kind: channel.kind,
+    role: channel.role,
+    displayName: extras?.displayName ?? channel.displayName,
+    handle: channel.handle,
+    url: channel.url,
+    subtitle: channel.subtitle ?? null,
+    avatarUrl: channel.avatarUrl ?? null,
+    verified: true
+  };
+}
+
+// server/verify-handler.ts
+async function fetchXProfileName(handle) {
+  try {
+    const url = `https://publish.twitter.com/oembed?url=${encodeURIComponent(`https://x.com/${handle}`)}&omit_script=true`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8e3) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data.author_name === "string" ? data.author_name.trim() : null;
+  } catch {
+    return null;
+  }
+}
+async function enrichChannel(channel) {
+  if (channel.kind !== "x") {
+    return serializeChannel(channel);
+  }
+  const liveName = await fetchXProfileName(channel.handle);
+  return serializeChannel(channel, liveName ? { displayName: liveName } : void 0);
+}
+async function handleVerifyChannelGet(query) {
+  const raw = typeof query.q === "string" ? query.q : typeof query.query === "string" ? query.query : "";
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return {
+      status: 200,
+      json: {
+        ok: true,
+        verified: false,
+        query: "",
+        message: "Enter an X handle, Telegram username, email, or domain to verify."
+      }
+    };
+  }
+  const match = lookupOfficialChannel(trimmed);
+  if (!match) {
+    return {
+      status: 200,
+      json: {
+        ok: true,
+        verified: false,
+        query: trimmed,
+        message: "This channel is not listed as an official Solid One account. Do not share keys, seed phrases, or payments."
+      }
+    };
+  }
+  const channel = await enrichChannel(match);
+  return {
+    status: 200,
+    json: {
+      ok: true,
+      verified: true,
+      query: trimmed,
+      channel
+    }
+  };
+}
+async function handleVerifyChannelsListGet() {
+  const official = OFFICIAL_CHANNELS.filter((c) => c.role === "official").map((c) => serializeChannel(c));
+  const foundingTeam = OFFICIAL_CHANNELS.filter((c) => c.role === "founding-team").map((c) => serializeChannel(c));
+  return {
+    status: 200,
+    json: { ok: true, official, foundingTeam }
+  };
+}
+
+// server/register-verify-routes.ts
+function registerVerifyRoutes(app2) {
+  app2.get(
+    "/api/verify",
+    asyncRoute(async (req, res) => {
+      const query = req.query;
+      const { status, json } = await handleVerifyChannelGet(query);
+      res.status(status).json(json);
+    })
+  );
+  app2.get(
+    "/api/verify/channels",
+    asyncRoute(async (_req, res) => {
+      const { status, json } = await handleVerifyChannelsListGet();
+      res.status(status).json(json);
+    })
+  );
+}
+
 // server/app.ts
 var __dirname3 = path4.dirname(fileURLToPath3(import.meta.url));
 function createApp() {
@@ -1560,6 +1857,7 @@ function createApp() {
   }
   registerBlogRoutes(app2, { requireAdmin, uploadsDir });
   registerDownloadRoutes(app2);
+  registerVerifyRoutes(app2);
   app2.get(
     "/api/admin/download/installs",
     requireAdmin,

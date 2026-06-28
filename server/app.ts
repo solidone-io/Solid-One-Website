@@ -22,6 +22,7 @@ import {
 } from "./support-handler.js";
 import { registerBlogRoutes } from "./register-blog-routes.js";
 import { registerDownloadRoutes } from "./register-download-routes.js";
+import { registerVerifyRoutes } from "./register-verify-routes.js";
 import { asyncRoute } from "./async-route.js";
 import { useBlobStorage } from "./persistent-json.js";
 import { isVercelRuntime } from "./runtime.js";
@@ -168,6 +169,7 @@ export function createApp() {
 
   registerBlogRoutes(app, { requireAdmin, uploadsDir });
   registerDownloadRoutes(app);
+  registerVerifyRoutes(app);
 
   app.get(
     "/api/admin/download/installs",

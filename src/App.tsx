@@ -16,6 +16,7 @@ import Extension from "@/pages/Extension";
 import { AppStoreReview, PlayStoreReview } from "@/pages/StoreReview";
 import Support from "@/pages/Support";
 import Download from "@/pages/Download";
+import Verify from "@/pages/Verify";
 import { CookieConsent } from "@/components/CookieConsent";
 import CareersComingSoon, { DevelopersComingSoon, PressComingSoon } from "@/pages/ComingSoon";
 
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/play-store" component={PlayStoreReview} />
       <Route path="/support" component={Support} />
       <Route path="/download" component={Download} />
+      <Route path="/verify" component={Verify} />
       <Route path="/admin1855" component={Admin} />
       <Route path="/admin1855/" component={Admin} />
       <Route path="/admin">
