@@ -249,10 +249,10 @@ export function InstallActionBar({ onStatsChange }: InstallActionBarProps) {
   if (installed && updateAvailable) {
     return (
       <div className="mt-6 space-y-3">
-        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-[13px] text-amber-100/90">
+        <p className="text-[13px] text-white/55 text-center">
           Update available — v{release?.versionName}. If install fails, uninstall the current app first, then install
           the new APK.
-        </div>
+        </p>
         <div className="flex flex-col sm:flex-row gap-3">
           <Button
             className="flex-1 h-12 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-[15px]"
