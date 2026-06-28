@@ -26,6 +26,7 @@ import { registerVerifyRoutes } from "./register-verify-routes.js";
 import { asyncRoute } from "./async-route.js";
 import { storageBackendLabel, useBlobStorage, useMongoStorage } from "./persistent-json.js";
 import { readMongoImage, ensureMongoIndexes } from "./mongo-store.js";
+import { runBlobToMongoMigration } from "./migrate-blob-to-mongo.js";
 import { isVercelRuntime } from "./runtime.js";
 import {
   handleAdminInstallsList,
@@ -226,6 +227,19 @@ export function createApp() {
     asyncRoute(async (req, res) => {
       const { status, json } = await handleAdminReviewReplyDelete(Number(req.params.id));
       res.status(status).json(json);
+    }),
+  );
+
+  app.post(
+    "/api/admin/migrate-from-blob",
+    requireAdmin,
+    asyncRoute(async (req, res) => {
+      const force =
+        req.query.force === "1" ||
+        req.query.force === "true" ||
+        req.body?.force === true;
+      const result = await runBlobToMongoMigration({ force });
+      res.status(result.ok ? 200 : 400).json(result);
     }),
   );
 
